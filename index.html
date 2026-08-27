@@ -55,16 +55,22 @@
         .then(function(stream) {
           if ("srcObject" in video) {
             video.srcObject = stream;
-           
           } else {
             video.src = window.URL.createObjectURL(stream);
           }
+          
+          video.onloadedmetadata = function() {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+               video.play();
+               requestAnimationFrame(tick);
+          };
         })
-      .catch(function(err) {
+      
+        .catch(function(err) {
        
           alert(err.name + ": " + err.message);
-      }
-    );
+        });
 
             
       detector = new AR.Detector({
@@ -72,7 +78,7 @@
       });
       
   
-      requestAnimationFrame(tick);
+      // requestAnimationFrame(tick);
    
     }
     
@@ -319,7 +325,7 @@
   <center>
     <div style="margin: 10px;"><strong>-= Augmented Reality Marker Detector =-</strong></div>
     
-    <video id="video" autoplay="true" playsinline style="width:640px; height:480px;"></video>
+    <video id="video" autoplay muted playsinline style="width:640px; height:480px;"></video>
 
     <canvas id="canvas"
             style="width:640px; height:480px;">
