@@ -225,10 +225,10 @@
     
 
      if (text === ""){
-       text = "Noch keine Antworten";
+       text = "Die Runde ist eröffnet";
      }
      if (missingText === ""){
-       missingText = "Keine fehlenden Antworten";
+       missingText = "Alle dabei!";
      }
      var summaryText =
        "A: " + counts.A + "<br>" +
@@ -238,7 +238,7 @@
      
      if (attendanceLocked){
           document.getElementById("results").innerHTML =
-               "<h3>Antworten</h3>" + text +
+               "<h3>Ergebnisse</h3>" + text +
             "<br><br><h3>Verteilung</h3>" +
             summaryText;
        }
@@ -247,11 +247,11 @@
          }
      
      document.getElementById("attendance").innerHTML = 
-              "<h3>Aktive Karten</h3>" + attendanceText;
+              "<h3>Wer spielt mit?</h3>" + attendanceText;
      
      if (attendanceLocked){
           document.getElementById("missing").innerHTML =
-            "<h3>Fehlende Antworten</h3>" + missingText;
+            "<h3>Noch offen</h3>" + missingText;
        }
        else{
           document.getElementById("missing").innerHTML = "";
@@ -332,27 +332,27 @@
     </canvas>
     
     <div id="results">
-      Noch keine Antworten
+      Die Runde ist eröffnet
     </div>
     
     <div id="attendance">
-      Noch keine aktiven Karten
+      Wer spielt mit?
     </div>
 
     <div id="missing">
-      Keine fehlenden Antworten
+      Alle dabei!
     </div>
 
     <button id="lockButton" 
       onclick="lockAttendance()"
       style="font-size:18px;padding:10px;margin:4px;">
-       Anwesenheit abschließen
+       Team steht fest
     </button>
 
     <button id="editButton"
          onclick="editAttendance()"
          style="display:none;font-size:18px;padding:10px;margin:4px;">
-       Anwesenheit ändern
+       Team ändern
     </button>
     
     <button id="questionButton" 
@@ -363,7 +363,7 @@
 
     <div id="attendanceEditor" style="display:none;">
       <p>
-         Änderungen der Anwesenheit:
+         Team ändern:
       </p>
       <input id="attendanceChanges"
         type="text"
