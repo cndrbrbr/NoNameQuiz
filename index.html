@@ -53,11 +53,16 @@
     body.presentation-mode #results,
     body.presentation-mode #attendance,
     body.presentation-mode #missing { font-size: 20px; }
+    /* Steuerung nur verkleinern (Schrift/Abstand), nie ausblenden oder per
+       Transform/Opacity verstecken – auf Touchscreens gibt es kein :hover,
+       um sie wieder "sichtbar" zu machen, das macht Buttons sonst dauerhaft
+       kaum antippbar. */
     body.presentation-mode .teacher-controls,
-    body.presentation-mode #tabs { transform: scale(0.6); opacity: 0.5; transition: opacity 0.2s, transform 0.2s; }
-    body.presentation-mode .teacher-controls:hover,
-    body.presentation-mode .teacher-controls:focus-within,
-    body.presentation-mode #tabs:hover { opacity: 1; transform: none; }
+    body.presentation-mode #tabs { font-size: 11px; }
+    body.presentation-mode .teacher-controls button,
+    body.presentation-mode .teacher-controls input,
+    body.presentation-mode .teacher-controls select,
+    body.presentation-mode #tabs button { font-size: 11px !important; padding: 3px 6px !important; }
   </style>
 
   <script>
