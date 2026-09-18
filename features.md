@@ -120,6 +120,20 @@ werden je Fach und Klasse dauerhaft als Statistik gespeichert.
 - Die Tipps sind ein optionales Zusatzangebot ("ggf."), keine verpflichtende
   Bewertung — die Lehrkraft entscheidet selbst, ob und wie sie reagiert.
 
+### F11 – Präsentationsansicht für Smartboard
+
+- Während des Scannens sollen auf einem Smartboard gleichzeitig sichtbar
+  sein: die aktuelle Frage mit den Antwortoptionen A–D, das Kamerabild vom
+  Handy (auf dem gescannt wird) und die live erkannten Ergebnisse/die
+  Verteilung.
+- Das Handy bleibt das Gerät, das scannt (Kamera + Kartenerkennung); das
+  Smartboard zeigt für die ganze Klasse sichtbar dieselben Informationen in
+  groß an.
+- Die Scan-Ansicht wird so aufgeräumt, dass sie sich für die Projektion
+  eignet: Frage, Antworten, Kamerabild und Live-Ergebnisse groß und klar,
+  Steuerungselemente der Lehrkraft (z. B. "Team steht fest", "Neue Frage")
+  unauffällig/klein, damit sie die Projektion nicht stören.
+
 ## Nicht-funktionale Anforderungen
 
 - Weiterhin ohne Build-Step nutzbar (reines HTML/JS wie bisher).

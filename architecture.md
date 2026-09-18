@@ -79,6 +79,43 @@ das würde jede Ansicht einfacher halten, aber Navigation und gemeinsamen
 Zustand (aktuelle Session) komplizierter machen. Bei spürbarem Wachstum der
 App ist das eine sinnvolle spätere Aufteilung.
 
+Die **Scan**-Ansicht ist zugleich die Präsentationsansicht (siehe
+[Präsentationsmodus](#präsentationsmodus-smartboard)): Sie enthält bereits
+Frage, Antworten, Kamerabild und Live-Ergebnisse auf einer Seite — genau die
+Elemente, die auf dem Smartboard sichtbar sein sollen.
+
+## Präsentationsmodus (Smartboard)
+
+Betrifft F11 aus `features.md`: Frage, Antworten, Kamerabild und
+Live-Ergebnisse sollen für die ganze Klasse auf einem Smartboard sichtbar
+sein, während das Handy scannt.
+
+**Empfehlung Phase 1 — Bildschirmspiegelung, kein neues Gerät-zu-Gerät-Sync:**
+Da die Scan-Ansicht in `index.html` Frage, Antworten, Kamerabild (`<video>`/
+`<canvas>`) und Live-Ergebnisse ohnehin auf einer Seite zeigt, reicht es, das
+Handy-Display per vorhandener Bordmittel auf das Smartboard zu spiegeln
+(Miracast/Smart-View unter Android, AirPlay unter iOS, Chromecast-Tab-Cast,
+oder ein HDMI-Kabel). Das erfordert **keine neue App-Architektur** — nur
+zwei Anpassungen an der bestehenden Scan-Ansicht:
+
+- Ein **Präsentationsmodus-Toggle**, der die Steuerungselemente der
+  Lehrkraft (Anwesenheit sperren, nächste Frage, Team ändern) klein/dezent
+  in eine Ecke legt oder ausblendet, damit sie die Projektion nicht stören,
+  aber für die Lehrkraft am Gerät weiter erreichbar bleiben.
+- Größere, aus der Distanz lesbare Darstellung von Frage, Antworttexten und
+  der Live-Verteilung (Layout-/CSS-Anpassung, keine neue Logik).
+
+**Alternative, für später — Companion-Display über zwei Geräte:** Handy
+scannt nur, ein zweites Browser-Fenster auf dem am Smartboard angeschlossenen
+Rechner zeigt eine eigens aufbereitete Präsentationsansicht, live
+synchronisiert (z. B. per WebRTC-Datenkanal oder lokalem WebSocket). Vorteil:
+sauberere Darstellung ohne jede Restspur der Scan-Steuerung, unabhängig von
+Spiegelungs-Kompatibilität einzelner Geräte/Räume. Nachteil: braucht ein
+Pairing/Signaling zwischen den zwei Geräten (z. B. QR-Code mit Sitzungs-ID)
+und damit ein weiteres bewegliches Teil, das ausfallen kann — deshalb bewusst
+nicht Teil von Phase 1, da die einfache Spiegelung die gestellte
+Anforderung bereits erfüllt.
+
 ## Datenmodell
 
 ```mermaid
@@ -353,5 +390,8 @@ oder `stats-view.js` angepasst werden müssen.
 7. Wiederholungslogik (`review.js`): Fehlerquote je Frage, Erzeugung von
    Wiederholungs-Fragensets (F9).
 8. KI-Tipps für die Lehrkraft (F10), aufbauend auf dem Proxy aus Schritt 6.
-9. Optional: Verwaltung von Fächern/Klassen direkt in der App.
-10. Optional, später: Server-Sync für Mehrgeräte-Nutzung (Phase 2).
+9. Präsentationsmodus (F11): Layout der Scan-Ansicht für Projektion
+   anpassen, Steuerungselemente dezent/ausblendbar machen.
+10. Optional: Verwaltung von Fächern/Klassen direkt in der App.
+11. Optional, später: Server-Sync für Mehrgeräte-Nutzung sowie
+    Companion-Display für den Präsentationsmodus (Phase 2).
