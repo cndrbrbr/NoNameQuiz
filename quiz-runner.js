@@ -53,6 +53,12 @@ var QuizRunner = (function () {
     return currentSession !== null;
   }
 
+  function showSessionUi(active) {
+    document.getElementById("scanSetupPanel").style.display = active ? "none" : "block";
+    document.getElementById("scanSessionPanel").style.display = active ? "block" : "none";
+    document.getElementById("questionDisplayPanel").style.display = active ? "block" : "none";
+  }
+
   function getCurrentQuestion() {
     if (!hasActiveSession()) return null;
     return currentQuestions[currentQuestionIndex] || null;
@@ -121,8 +127,7 @@ var QuizRunner = (function () {
           currentQuestionIndex = 0;
           responses = {};
 
-          document.getElementById("scanSetupPanel").style.display = "none";
-          document.getElementById("scanSessionPanel").style.display = "block";
+          showSessionUi(true);
           renderCurrentQuestion();
           setMessage("", false);
         });
@@ -170,8 +175,7 @@ var QuizRunner = (function () {
         currentQuestionIndex = 0;
         responses = {};
 
-        document.getElementById("scanSessionPanel").style.display = "none";
-        document.getElementById("scanSetupPanel").style.display = "block";
+        showSessionUi(false);
         renderCurrentQuestion();
         setMessage(
           "Sitzung beendet. Ergebnisse stehen im Tab „Statistik“.",

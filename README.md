@@ -115,10 +115,18 @@ new "Wiederholung …" question set for the next session with that class.
 
 ### Presentation mode (smartboard)
 
-The **"Präsentation an/aus"** button shrinks the teacher controls and enlarges
-the question/answers/results text, for when the phone's screen is mirrored to
+Rotating the phone to **landscape** switches the Scan tab to a two-column
+layout sized for a 16:9 screen: camera view/question/answers on the left,
+teacher controls (session setup, attendance, next/end question) on the
+right — meant for exactly this moment, when the phone's screen is mirrored to
 a smartboard (Miracast/AirPlay/Chromecast/HDMI) so the room sees question,
-answer options, camera feed, and live results together. See
+answer options, camera feed, and live results together. Only the processed
+camera view (with detected markers highlighted) is shown — the raw camera
+preview is kept off-screen since it would just duplicate that image.
+
+The **"Präsentation an/aus"** button additionally shrinks the teacher
+controls and enlarges the question/answers/results text further, for when
+you want the room-facing content even bigger regardless of orientation. See
 [architecture.md](architecture.md#präsentationsmodus-smartboard) for why this
 doesn't need a second device/app.
 

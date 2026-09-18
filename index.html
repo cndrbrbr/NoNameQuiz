@@ -22,6 +22,32 @@
     table { margin: 8px auto; }
     #qsQuestionsContainer, #viewFragen, #viewStatistik { text-align: left; max-width: 640px; margin: 0 auto; }
 
+    /* Video bleibt als Bildquelle für die Canvas aktiv, ist aber unsichtbar –
+       die Canvas zeigt dasselbe Bild bereits inkl. Marker-Overlay. */
+    #video { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+
+    #canvas { width: 100%; max-width: 640px; height: auto; }
+
+    .scan-main { max-width: 640px; margin: 0 auto; }
+    .scan-side { max-width: 640px; margin: 0 auto; }
+
+    /* Querformat (Handy gedreht = fürs Smartboard-Mirroring): zweispaltig
+       statt lang gestapelt, damit die Breite eines 16:9-Screens genutzt wird. */
+    @media (orientation: landscape) {
+      .scan-layout {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 24px;
+        text-align: left;
+      }
+      .scan-main { flex: 2 1 480px; }
+      .scan-side { flex: 1 1 280px; max-width: 320px; }
+      #questionText { font-size: 28px; }
+      #questionOptionsDisplay div { font-size: 20px; }
+    }
+
     body.presentation-mode #questionText { font-size: 42px; }
     body.presentation-mode #questionOptionsDisplay div { font-size: 28px; }
     body.presentation-mode #results,
@@ -91,8 +117,8 @@
       canvas = document.getElementById("canvas");
       context = canvas.getContext("2d");
 
-      canvas.width = parseInt(canvas.style.width);
-      canvas.height = parseInt(canvas.style.height);
+      canvas.width = 640;
+      canvas.height = 480;
 
       if (!window.isSecureContext) {
         setCameraStatus(
@@ -465,58 +491,64 @@
     <div id="viewScan">
       <div style="margin: 10px;"><strong>NoNameQuiz</strong></div>
 
-      <div id="scanSetupPanel" class="teacher-controls">
-        <input type="text" id="scanSubjectInput" list="subjectsDatalist" placeholder="Fach">
-        <input type="text" id="scanClassInput" list="classGroupsDatalist" placeholder="Klasse">
-        <br>
-        <select id="scanQuestionSetSelect"></select>
-        <button type="button" onclick="handleStartSession()">Sitzung starten</button>
-        <div id="scanMessage"></div>
-      </div>
+      <div class="scan-layout">
+        <div class="scan-main">
+          <div id="cameraStatus" style="display:none;font-weight:bold;"></div>
+          <button id="cameraRetryBtn" type="button" onclick="retryCamera()" style="display:none;">
+            Kamera erneut versuchen
+          </button>
 
-      <div id="scanSessionPanel" class="teacher-controls" style="display:none;">
-        <div id="questionProgress"></div>
-        <div id="questionText" style="font-weight:bold;font-size:20px;"></div>
-        <div id="questionOptionsDisplay"></div>
-        <button type="button" onclick="handleNextQuestion()">Nächste Frage</button>
-        <button type="button" onclick="handleEndSession()">Sitzung beenden</button>
-      </div>
+          <video id="video" autoplay muted playsinline></video>
+          <canvas id="canvas"></canvas>
 
-      <div id="cameraStatus" style="display:none;font-weight:bold;max-width:640px;margin:8px auto;"></div>
-      <button id="cameraRetryBtn" type="button" onclick="retryCamera()" style="display:none;">
-        Kamera erneut versuchen
-      </button>
+          <div id="questionDisplayPanel" style="display:none;">
+            <div id="questionProgress"></div>
+            <div id="questionText" style="font-weight:bold;font-size:20px;"></div>
+            <div id="questionOptionsDisplay"></div>
+          </div>
 
-      <video id="video" autoplay muted playsinline style="width:640px;"></video>
+          <div id="results">
+            Die Runde ist eröffnet
+          </div>
+        </div>
 
-      <canvas id="canvas" style="width:640px;"></canvas>
+        <div class="scan-side teacher-controls">
+          <div id="scanSetupPanel">
+            <input type="text" id="scanSubjectInput" list="subjectsDatalist" placeholder="Fach">
+            <input type="text" id="scanClassInput" list="classGroupsDatalist" placeholder="Klasse">
+            <br>
+            <select id="scanQuestionSetSelect"></select>
+            <button type="button" onclick="handleStartSession()">Sitzung starten</button>
+            <div id="scanMessage"></div>
+          </div>
 
-      <div id="results">
-        Die Runde ist eröffnet
-      </div>
+          <div id="scanSessionPanel" style="display:none;">
+            <button type="button" onclick="handleNextQuestion()">Nächste Frage</button>
+            <button type="button" onclick="handleEndSession()">Sitzung beenden</button>
+          </div>
 
-      <div id="attendance">
-        Wer spielt mit?
-      </div>
+          <div id="attendance">
+            Wer spielt mit?
+          </div>
 
-      <div id="missing">
-        Alle dabei!
-      </div>
+          <div id="missing">
+            Alle dabei!
+          </div>
 
-      <div class="teacher-controls">
-        <button id="lockButton" onclick="lockAttendance()" style="font-size:18px;padding:10px;margin:4px;">
-          Team steht fest
-        </button>
+          <button id="lockButton" onclick="lockAttendance()" style="font-size:18px;padding:10px;margin:4px;">
+            Team steht fest
+          </button>
 
-        <button id="editButton" onclick="editAttendance()"
-          style="display:none;font-size:18px;padding:10px;margin:4px;">
-          Team ändern
-        </button>
+          <button id="editButton" onclick="editAttendance()"
+            style="display:none;font-size:18px;padding:10px;margin:4px;">
+            Team ändern
+          </button>
 
-        <div id="attendanceEditor" style="display:none;">
-          <p>Team ändern:</p>
-          <input id="attendanceChanges" type="text" placeholder="+17 -18 -94">
-          <button onclick="applyAttendanceChanges()">Übernehmen</button>
+          <div id="attendanceEditor" style="display:none;">
+            <p>Team ändern:</p>
+            <input id="attendanceChanges" type="text" placeholder="+17 -18 -94">
+            <button onclick="applyAttendanceChanges()">Übernehmen</button>
+          </div>
         </div>
       </div>
 

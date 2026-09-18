@@ -105,6 +105,13 @@ zwei Anpassungen an der bestehenden Scan-Ansicht:
   aber für die Lehrkraft am Gerät weiter erreichbar bleiben.
 - Größere, aus der Distanz lesbare Darstellung von Frage, Antworttexten und
   der Live-Verteilung (Layout-/CSS-Anpassung, keine neue Logik).
+- **Umgesetzt:** eine `@media (orientation: landscape)`-Regel stellt die
+  Scan-Ansicht bei gedrehtem Handy von einer gestapelten Spalte auf zwei
+  nebeneinander liegende Bereiche um (`scan-main`: Kamerabild, Frage,
+  Ergebnisse; `scan-side`: Steuerung), passend für ein 16:9-Smartboard.
+  Zusätzlich wird nur die verarbeitete Canvas (Video + erkannte Marker)
+  angezeigt, nicht mehr zusätzlich das unbearbeitete `<video>`-Bild
+  darunter — das war dieselbe Aufnahme doppelt.
 
 **Alternative, für später — Companion-Display über zwei Geräte:** Handy
 scannt nur, ein zweites Browser-Fenster auf dem am Smartboard angeschlossenen
@@ -282,22 +289,50 @@ dafür minimal erweitert, nicht ersetzt.
 Betrifft F8 (Fragen zu einem Themenbereich generieren) und F10 (Tipps für
 die Lehrkraft) aus `features.md`.
 
-**Warum kein direkter Aufruf der KI-API aus dem Browser:** Ein API-Key im
+**Festgelegt: Modell ist selbstgehostetes Mistral** unter
+`mistral.cndrbrbr.de`, kein Cloud-Anbieter (Anthropic/OpenAI/etc.). Das
+ändert diesen Abschnitt gegenüber der ursprünglichen Annahme:
+
+- Kein API-Key-Geheimnis in dem Sinne, wie bei einem kommerziellen
+  Cloud-Anbieter — `mistral.cndrbrbr.de` ist offenbar über eine eigene
+  (Sub-)Domain erreichbar, die Frage ist eher Zugriffsschutz (offen im
+  Internet vs. nur intern/per Token abgesichert) als Geheimhaltung eines
+  Vendor-Keys.
+- Noch offen: welche Server-Software dahinter läuft (Ollama, ein
+  OpenAI-kompatibles API wie vLLM/text-generation-webui, oder etwas
+  anderes) — das bestimmt das genaue Request/Response-Format, das
+  `ai-service.js`/der Proxy sprechen muss. Die Endpunkt-Namen unten
+  (`/api/generate-questions` etc.) sind das App-seitige, stabile Interface;
+  der Proxy übersetzt intern ins tatsächliche Mistral-API-Format.
+- Ob überhaupt noch ein separater Proxy nötig ist oder die App direkt gegen
+  `mistral.cndrbrbr.de` sprechen kann, hängt davon ab, ob dort schon
+  Zugriffsschutz/CORS für Browser-Anfragen eingerichtet ist — sonst bleibt
+  ein schlanker Proxy sinnvoll, um z. B. ein Zugriffs-Token nicht im Client
+  offenzulegen und CORS zentral zu setzen.
+
+**Warum trotzdem ein schlanker Server-Proxy statt direktem Aufruf aus dem
+Browser (Empfehlung, sofern `mistral.cndrbrbr.de` keinen offenen,
+CORS-fähigen öffentlichen Zugriff bietet):** Ein API-Key/Zugriffstoken im
 Client-JavaScript einer statisch gehosteten Seite ist für jeden Besucher
 sichtbar (Browser-DevTools, Netzwerk-Tab) und könnte missbraucht werden.
-Daher braucht es einen minimalen, zustandslosen Server-Proxy, der den Key
-serverseitig hält und Anfragen an die KI-API (z. B. die Anthropic-API)
-weiterleitet. Der Proxy speichert keine Daten — die einzige Persistenz
-bleibt IndexedDB im Client.
+Der Proxy speichert keine Daten — die einzige Persistenz bleibt IndexedDB
+im Client.
 
 Empfehlung: eine einzelne kleine Funktion (Cloudflare Worker, Netlify/Vercel
-Function, oder eine einzelne Express-Route), drei Endpunkte:
+Function, oder eine einzelne Express-Route — ggf. direkt auf demselben
+Server wie Mistral), drei Endpunkte:
 
 - `POST /api/generate-questions` — Body: `{ topic, subject, count, materials? }`.
   `materials` ist optional die per `materials.js`/`store.js` hochgeladenen
-  Unterrichtsmaterialien zum Fach (Text direkt, PDFs base64-codiert — die
-  Anthropic-API akzeptiert PDF-Dokumente direkt als Eingabe, eine
-  clientseitige Textextraktion ist nicht nötig). Antwort: Fragenset im
+  Unterrichtsmaterialien zum Fach. Ob PDFs direkt an Mistral durchgereicht
+  werden können, hängt von der noch offenen Server-Software ab (siehe oben)
+  — anders als bei manchen Cloud-APIs ist PDF-Direkteingabe bei
+  selbstgehosteten Modellen nicht garantiert. Bis das geklärt ist, geht die
+  App vom robusteren Fall aus: reine Textmaterialien (.txt/.md) werden als
+  Text mitgeschickt, PDFs vorerst nur mitgeschickt, wenn der Proxy sie
+  serverseitig in Text umwandeln kann (z. B. `pdf-parse` in Node) —
+  clientseitige PDF-Textextraktion ist explizit nicht Ziel, um `materials.js`
+  schlank zu halten. Antwort: Fragenset im
   [Upload-Format](#format-für-den-fragen-upload-json) (inkl.
   `correctAnswer`), das `ai-service.js` wie ein manuell hochgeladenes
   Fragenset über `question-editor.js`/`store.js` speichert
