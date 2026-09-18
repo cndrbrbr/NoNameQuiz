@@ -71,6 +71,21 @@
 
     // --- Kamera / ArUco-Erkennung (bestehende Logik) ----------------------
 
+    function setCameraStatus(text, isError) {
+      var el = document.getElementById("cameraStatus");
+      var retryBtn = document.getElementById("cameraRetryBtn");
+      if (!el) return;
+      el.textContent = text;
+      el.style.color = isError ? "crimson" : "inherit";
+      el.style.display = text ? "block" : "none";
+      if (retryBtn) retryBtn.style.display = isError ? "inline" : "none";
+    }
+
+    function retryCamera() {
+      setCameraStatus("Kamera wird gestartet …", false);
+      initCamera();
+    }
+
     function initCamera() {
       video = document.getElementById("video");
       canvas = document.getElementById("canvas");
@@ -78,6 +93,18 @@
 
       canvas.width = parseInt(canvas.style.width);
       canvas.height = parseInt(canvas.style.height);
+
+      if (!window.isSecureContext) {
+        setCameraStatus(
+          "Diese Seite läuft nicht über HTTPS/localhost — der Browser " +
+            "verweigert deshalb den Kamerazugriff. Bitte über eine " +
+            "https://-Adresse öffnen.",
+          true
+        );
+        return;
+      }
+
+      setCameraStatus("Kamera wird gestartet …", false);
 
       if (navigator.mediaDevices === undefined) {
         navigator.mediaDevices = {};
@@ -114,11 +141,17 @@
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             video.play();
+            setCameraStatus("", false);
             requestAnimationFrame(tick);
           };
         })
         .catch(function (err) {
-          alert(err.name + ": " + err.message);
+          setCameraStatus(
+            "Kamerazugriff fehlgeschlagen (" + err.name + "): " + err.message +
+              " — Kamera-Berechtigung für diese Seite in den Browser-/" +
+              "Website-Einstellungen prüfen, dann erneut versuchen.",
+            true
+          );
         });
 
       detector = new AR.Detector({
@@ -448,6 +481,11 @@
         <button type="button" onclick="handleNextQuestion()">Nächste Frage</button>
         <button type="button" onclick="handleEndSession()">Sitzung beenden</button>
       </div>
+
+      <div id="cameraStatus" style="display:none;font-weight:bold;max-width:640px;margin:8px auto;"></div>
+      <button id="cameraRetryBtn" type="button" onclick="retryCamera()" style="display:none;">
+        Kamera erneut versuchen
+      </button>
 
       <video id="video" autoplay muted playsinline style="width:640px;"></video>
 
