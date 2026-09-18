@@ -26,7 +26,11 @@
        die Canvas zeigt dasselbe Bild bereits inkl. Marker-Overlay. */
     #video { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 
-    #canvas { width: 100%; max-width: 640px; height: auto; }
+    /* max-height verhindert, dass die Canvas (v.a. bevor ein Kamerabild da
+       ist, unsichtbar auf dunklem Hintergrund) im niedrigen Querformat-
+       Viewport eines Handys mehr Höhe belegt, als sichtbar ist, und Frage/
+       Ergebnisse darunter aus dem sichtbaren Bereich schiebt. */
+    #canvas { width: 100%; max-width: 480px; max-height: 30vh; height: auto; }
 
     .scan-main { max-width: 640px; margin: 0 auto; }
     .scan-side { max-width: 640px; margin: 0 auto; }
@@ -44,6 +48,7 @@
       }
       .scan-main { flex: 2 1 480px; }
       .scan-side { flex: 1 1 280px; max-width: 320px; }
+      #canvas { max-width: 280px; max-height: 45vh; }
       #questionText { font-size: 28px; }
       #questionOptionsDisplay div { font-size: 20px; }
     }
@@ -498,6 +503,12 @@
 
       <div class="scan-layout">
         <div class="scan-main">
+          <div id="questionDisplayPanel" style="display:none;">
+            <div id="questionProgress"></div>
+            <div id="questionText" style="font-weight:bold;font-size:20px;"></div>
+            <div id="questionOptionsDisplay"></div>
+          </div>
+
           <div id="cameraStatus" style="display:none;font-weight:bold;"></div>
           <button id="cameraRetryBtn" type="button" onclick="retryCamera()" style="display:none;">
             Kamera erneut versuchen
@@ -505,12 +516,6 @@
 
           <video id="video" autoplay muted playsinline></video>
           <canvas id="canvas"></canvas>
-
-          <div id="questionDisplayPanel" style="display:none;">
-            <div id="questionProgress"></div>
-            <div id="questionText" style="font-weight:bold;font-size:20px;"></div>
-            <div id="questionOptionsDisplay"></div>
-          </div>
 
           <div id="results">
             Die Runde ist eröffnet
