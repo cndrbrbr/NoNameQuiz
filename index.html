@@ -22,9 +22,15 @@
     table { margin: 8px auto; }
     #qsQuestionsContainer, #viewFragen, #viewStatistik { text-align: left; max-width: 640px; margin: 0 auto; }
 
-    /* Video bleibt als Bildquelle für die Canvas aktiv, ist aber unsichtbar –
-       die Canvas zeigt dasselbe Bild bereits inkl. Marker-Overlay. */
-    #video { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+    /* Video bleibt als Bildquelle für die Canvas aktiv, die Canvas zeigt
+       dasselbe Bild bereits inkl. Marker-Overlay – deshalb nur als kleines
+       Vorschaubild statt in voller Größe. Bewusst NICHT per position:
+       absolute + clip komplett versteckt: auf manchen mobilen Browsern
+       (z. B. Samsung Internet) wird ein so verstecktes <video> nicht
+       zuverlässig weiter dekodiert, bis ein App-Fokuswechsel das Rendering
+       erzwingt – die Canvas blieb dann leer. Klein, aber normal im
+       Layout gerendert, umgeht das. */
+    #video { width: 96px; height: 72px; }
 
     /* max-height verhindert, dass die Canvas (v.a. bevor ein Kamerabild da
        ist, unsichtbar auf dunklem Hintergrund) im niedrigen Querformat-
