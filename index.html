@@ -81,7 +81,6 @@
     var activeCards = {};
     var confirmedCards = {};
     var attendanceLocked = false;
-    var cameraInitialized = false;
 
     // --- Tabs / Präsentationsmodus ---------------------------------------
 
@@ -94,10 +93,6 @@
         btn.classList.toggle("active", btn.dataset.view === name);
       });
 
-      if (name === "scan" && !cameraInitialized) {
-        cameraInitialized = true;
-        initCamera();
-      }
       if (name === "fragen") {
         QuestionEditor.renderQuestionSetList();
       }
@@ -112,23 +107,29 @@
     }
 
     // --- Kamera / ArUco-Erkennung (bestehende Logik) ----------------------
+    // Wird bewusst erst per Tap auf einen Button gestartet, nicht
+    // automatisch beim Laden: manche mobile Browser (u.a. Samsung Internet)
+    // starten einen Kamera-Stream nur zuverlässig direkt aus einer
+    // Nutzer-Geste heraus, sonst blieb das Bild bis zu einem App-
+    // Fokuswechsel leer.
 
     function setCameraStatus(text, isError) {
       var el = document.getElementById("cameraStatus");
-      var retryBtn = document.getElementById("cameraRetryBtn");
+      var startBtn = document.getElementById("cameraStartBtn");
       if (!el) return;
       el.textContent = text;
       el.style.color = isError ? "crimson" : "inherit";
       el.style.display = text ? "block" : "none";
-      if (retryBtn) retryBtn.style.display = isError ? "inline" : "none";
-    }
-
-    function retryCamera() {
-      setCameraStatus("Kamera wird gestartet …", false);
-      initCamera();
+      if (startBtn) {
+        startBtn.textContent = isError ? "Kamera erneut versuchen" : "Kamera starten";
+        startBtn.disabled = false;
+      }
     }
 
     function initCamera() {
+      var startBtn = document.getElementById("cameraStartBtn");
+      if (startBtn) startBtn.disabled = true;
+
       video = document.getElementById("video");
       canvas = document.getElementById("canvas");
       context = canvas.getContext("2d");
@@ -184,6 +185,7 @@
             canvas.height = video.videoHeight;
             video.play();
             setCameraStatus("", false);
+            if (startBtn) startBtn.style.display = "none";
             requestAnimationFrame(tick);
           };
         })
@@ -516,8 +518,8 @@
           </div>
 
           <div id="cameraStatus" style="display:none;font-weight:bold;"></div>
-          <button id="cameraRetryBtn" type="button" onclick="retryCamera()" style="display:none;">
-            Kamera erneut versuchen
+          <button id="cameraStartBtn" type="button" onclick="initCamera()" style="font-size:18px;padding:10px;">
+            Kamera starten
           </button>
 
           <video id="video" autoplay muted playsinline></video>
