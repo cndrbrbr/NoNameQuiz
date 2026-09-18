@@ -91,25 +91,38 @@ werden je Fach und Klasse dauerhaft als Statistik gespeichert.
 ### F8 – KI-gestützte Fragengenerierung
 
 - Lehrkraft gibt einen Themenbereich ein (z. B. "Bruchrechnung, Klasse 7").
+- Zusätzlich können eigene Unterrichtsmaterialien (Skript, Arbeitsblatt,
+  Folien) zum jeweiligen Fach hochgeladen werden, damit die KI beim
+  Generieren weiß, was im Unterricht tatsächlich behandelt wurde, statt nur
+  generisch zum Themenbereich zu fragen.
 - Eine KI-Komponente schlägt dazu ein Fragenset vor: Fragetexte, vier
   Antwortoptionen A–D je Frage sowie die jeweils richtige Antwort.
 - Die Lehrkraft kann den Vorschlag vor der Übernahme sichten, einzelne
   Fragen bearbeiten/verwerfen und erst dann als Fragenset speichern (siehe
   F1) — die KI ersetzt also die manuelle Eingabe, nicht die Kontrolle durch
   die Lehrkraft.
+- Dieselbe Anbindung wird für die Wiederholungsfragen aus F9 genutzt.
 
 ### F9 – Wiederholung falsch beantworteter Fragen
 
 - Nach einer Sitzung erkennt das System, welche Fragen auffällig oft falsch
   beantwortet wurden (hohe Fehlerquote).
 - Für die nächste Sitzung derselben Klasse/desselben Fachs kann daraus ein
-  **Wiederholungs-Fragenset** erzeugt werden, das genau diese Fragen erneut
-  stellt.
+  **Wiederholungs-Fragenset** erzeugt werden. Dabei werden die betroffenen
+  Fragen **nicht wortgleich wiederholt**, sondern von der KI (F8) als
+  **ähnliche, aber andere Fragen neu formuliert**, die gezielt die
+  Fehlvorstellung hinter der jeweils gewählten falschen Antwort abfragen —
+  reines Wiedererkennen der alten Frage/Antwort soll vermieden werden.
+- Damit ist F9 kein rein clientseitig berechenbares Feature mehr: Die
+  Fehlerquote-Berechnung bleibt clientseitig, die Erzeugung der neuen Fragen
+  läuft über dieselbe KI-Anbindung wie F8 (siehe architecture.md). Solange
+  diese Anbindung fehlt, kann die App interimsweise nur die identischen
+  Fragen erneut vorlegen — das ist explizit ein Platzhalter, kein Ersatz.
 - In der Standardausbaustufe erfolgt die Wiederholung klassenweise (alle
-  bekommen dieselben, zuvor schwierigen Fragen erneut). Eine Wiederholung
-  gezielt für einzelne Schüler (über die Kartennummer) ist nur sinnvoll,
-  wenn dieselbe Karte dauerhaft derselben Person zugeordnet ist, und ist
-  daher als spätere Ausbaustufe vorgesehen.
+  bekommen dieselben neuen Fragen). Eine Wiederholung gezielt für einzelne
+  Schüler (über die Kartennummer) ist nur sinnvoll, wenn dieselbe Karte
+  dauerhaft derselben Person zugeordnet ist, und ist daher als spätere
+  Ausbaustufe vorgesehen.
 
 ### F10 – KI-Tipps für die Lehrkraft
 

@@ -11,6 +11,7 @@
   <script src="export.js"></script>
   <script src="review.js"></script>
   <script src="question-editor.js"></script>
+  <script src="materials.js"></script>
   <script src="quiz-runner.js"></script>
   <script src="stats-view.js"></script>
 
@@ -388,6 +389,12 @@
 
     <!-- ================= Fragen ================= -->
     <div id="viewFragen" style="display:none;">
+      <h3>Schnellstart</h3>
+      <button type="button"
+        onclick="QuestionEditor.loadSampleQuestionSet('sample-data/informatik-grundlagen.json')">
+        Beispiel-Fragenset "Informatik Grundlagen" laden
+      </button>
+
       <h3>Fragenset hochladen (JSON)</h3>
       <input type="file" id="qsJsonFile" accept="application/json"
         onchange="QuestionEditor.handleJsonFile(this.files[0])">
@@ -404,6 +411,21 @@
 
       <h3>Vorhandene Fragensets</h3>
       <div id="qsList"></div>
+
+      <h3>Materialien</h3>
+      <p style="font-size:13px;">
+        Unterrichtsmaterialien (Skript, Arbeitsblatt, Folien als .txt/.md/.pdf)
+        pro Fach ablegen. Wird lokal gespeichert und dient künftig als
+        Kontext für die KI-Fragengenerierung – die KI-Anbindung selbst ist
+        noch nicht gebaut, siehe
+        <a href="architecture.md#ki-komponente-fragengenerierung--tipps">architecture.md</a>.
+      </p>
+      <input type="text" id="matSubjectInput" list="subjectsDatalist" placeholder="Fach"
+        onchange="Materials.renderList()">
+      <input type="file" id="matFile" accept=".txt,.md,.pdf"
+        onchange="Materials.handleUpload(this.files[0])">
+      <div id="matMessage"></div>
+      <div id="matList"></div>
     </div>
 
     <!-- ================= Scan ================= -->
@@ -484,6 +506,12 @@
 
       <div>
         <button type="button" onclick="StatsView.suggestReview()">Wiederholungsset vorschlagen</button>
+        <p style="font-size:13px;">
+          Hinweis: Erzeugt aktuell dieselben Fragen unverändert erneut
+          (Platzhalter). Ähnliche Fragen, die gezielt die Fehlvorstellung
+          hinter der falschen Antwort abfragen, erstellt künftig die KI,
+          sobald sie angebunden ist.
+        </p>
         <div id="statsReviewCandidates"></div>
       </div>
     </div>

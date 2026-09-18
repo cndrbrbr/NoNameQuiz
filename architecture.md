@@ -57,7 +57,8 @@ Weiterhin reine `<script>`-Dateien ohne Bundler, analog zu `aruco.js` etc.:
 | `stats-view.js` | Anzeige/Filterung gespeicherter Ergebnisse nach Fach/Klasse/Sitzung. |
 | `ai-service.js` | Kommuniziert mit dem KI-Proxy (nicht direkt mit der KI-API): Fragengenerierung zu einem Themenbereich (F8) und Tipps für die Lehrkraft (F10). |
 | `export.js` | Bereitet Ergebnisse für den Export auf: Kopieren als HTML-Tabelle in die Zwischenablage (für OneNote), Download als CSV/JSON. |
-| `review.js` | Berechnet die Fehlerquote je Frage aus `AnswerRecord` + `Question.correctAnswer` und erzeugt daraus Wiederholungs-Fragensets (F9). |
+| `review.js` | Berechnet die Fehlerquote je Frage aus `AnswerRecord` + `Question.correctAnswer` und erzeugt daraus Wiederholungs-Fragensets (F9, Neuformulierung über `ai-service.js`). |
+| `materials.js` | Verwaltet hochgeladene Unterrichtsmaterialien pro Fach (Ablage in IndexedDB, Kontext für F8/F9). |
 
 `index.html` bleibt der Einstiegspunkt, bindet die neuen Skripte zusätzlich
 zu `aruco.js`/`cv.js`/`polyfill.js` ein.
@@ -126,10 +127,19 @@ erDiagram
     QUESTIONSET ||--o{ SESSION : "wird verwendet in"
     SESSION ||--o{ ANSWERRECORD : "erzeugt"
     QUESTION ||--o{ ANSWERRECORD : "beantwortet durch"
+    SUBJECT ||--o{ MATERIAL : "hat"
 
     SUBJECT {
         string id
         string name
+    }
+    MATERIAL {
+        string id
+        string subjectId
+        string filename
+        string mimeType
+        blob content
+        datetime uploadedAt
     }
     CLASSGROUP {
         string id
@@ -196,6 +206,10 @@ Hinweise:
 - `QuestionSet.origin` unterscheidet, wie ein Fragenset entstanden ist:
   `manual` (F1), `ai` (F8) oder `review` (F9, automatisch aus einer
   Vorgänger-Sitzung erzeugt, `sourceSessionId` verweist auf diese).
+- `Material` ist unabhängig von Fragensets/Sitzungen und hängt nur am Fach:
+  Materialien sollen fachübergreifend über mehrere Fragensets/Sitzungen
+  hinweg als KI-Kontext wiederverwendbar sein, nicht an ein einzelnes
+  Fragenset gebunden.
 
 ## Datenfluss
 
@@ -277,13 +291,24 @@ weiterleitet. Der Proxy speichert keine Daten — die einzige Persistenz
 bleibt IndexedDB im Client.
 
 Empfehlung: eine einzelne kleine Funktion (Cloudflare Worker, Netlify/Vercel
-Function, oder eine einzelne Express-Route), zwei Endpunkte:
+Function, oder eine einzelne Express-Route), drei Endpunkte:
 
-- `POST /api/generate-questions` — Body: `{ topic, subject, count }` →
-  Antwort: Fragenset im [Upload-Format](#format-für-den-fragen-upload-json)
-  (inkl. `correctAnswer`), das `ai-service.js` dann wie ein manuell
-  hochgeladenes Fragenset über `question-editor.js`/`store.js` speichert
+- `POST /api/generate-questions` — Body: `{ topic, subject, count, materials? }`.
+  `materials` ist optional die per `materials.js`/`store.js` hochgeladenen
+  Unterrichtsmaterialien zum Fach (Text direkt, PDFs base64-codiert — die
+  Anthropic-API akzeptiert PDF-Dokumente direkt als Eingabe, eine
+  clientseitige Textextraktion ist nicht nötig). Antwort: Fragenset im
+  [Upload-Format](#format-für-den-fragen-upload-json) (inkl.
+  `correctAnswer`), das `ai-service.js` wie ein manuell hochgeladenes
+  Fragenset über `question-editor.js`/`store.js` speichert
   (`QuestionSet.origin = "ai"`), nachdem die Lehrkraft es gesichtet hat.
+- `POST /api/generate-review-questions` — Body: `{ questions: [{ text,
+  options, correctAnswer, wrongAnswerCounts }], materials? }`, eine Frage pro
+  Wiederholungs-Kandidat aus F9. Antwort: pro übergebener Frage eine **neue,
+  andersartige** Frage im selben Format, die laut Prompt gezielt die
+  Fehlvorstellung hinter der am häufigsten gewählten falschen Antwort prüft,
+  nicht die ursprüngliche Frage umformuliert oder wiederholt. `review.js`
+  reicht diese Antworten an `saveQuestionSet` mit `origin = "review"` weiter.
 - `POST /api/teaching-tips` — Body: `{ questionText, options, errorRate,
   mostCommonWrongAnswer }` → Antwort: ein kurzer Freitext-Hinweis, z. B.
   "Viele haben C statt B gewählt — ggf. den Unterschied zwischen ... noch
@@ -291,9 +316,19 @@ Function, oder eine einzelne Express-Route), zwei Endpunkte:
   (die Lehrkraft entscheidet situativ, keine dauerhafte Bewertung einzelner
   Fragen).
 
-Beide Endpunkte sind reine Anfrage/Antwort-Aufrufe ohne eigenen Datenspeicher
-und ohne Bezug zu einzelnen Schülern — es werden nur Fragetext, Optionen und
-aggregierte Zahlen übertragen, keine Kartennummern.
+Alle drei Endpunkte sind reine Anfrage/Antwort-Aufrufe ohne eigenen
+Datenspeicher und ohne Bezug zu einzelnen Schülern — es werden nur
+Fragetext, Optionen, hochgeladene Materialien und aggregierte Zahlen
+übertragen, keine Kartennummern.
+
+**Materialien als Kontext (`materials.js`):** Damit die KI weiß, was im
+Unterricht tatsächlich behandelt wurde, statt nur zum Themenbegriff zu
+generieren, können pro Fach Materialien (.txt/.md/.pdf) hochgeladen werden.
+Sie werden als Blob in einem eigenen IndexedDB-Object-Store `materials`
+abgelegt (siehe Datenmodell) — rein clientseitig, unabhängig vom KI-Proxy
+nutzbar. Erst beim tatsächlichen Aufruf von `/api/generate-questions` bzw.
+`/api/generate-review-questions` sendet `ai-service.js` sie mit; der Proxy
+selbst speichert nichts davon.
 
 ## Export für OneNote
 
@@ -326,12 +361,28 @@ Fehlerquote(Frage) = Anzahl AnswerRecords mit answer != question.correctAnswer
 ```
 
 Fragen oberhalb eines Schwellwerts (Standardvorschlag: 40 %) werden als
-Kandidaten für ein **Wiederholungs-Fragenset** vorgeschlagen. Übernimmt die
-Lehrkraft den Vorschlag, legt `store.js` ein neues `QuestionSet` mit
-`origin = "review"` und `sourceSessionId` an, das dieselben `Question`-
-Einträge referenziert (keine Kopie der Fragetexte nötig) und in der nächsten
-Sitzung derselben Klasse/desselben Fachs wie jedes andere Fragenset genutzt
-werden kann.
+Kandidaten für ein **Wiederholungs-Fragenset** vorgeschlagen. Wichtig: Die
+Lehrkraft möchte hier **keine wortgleiche Wiederholung**, sondern neue,
+inhaltlich verwandte Fragen, die gezielt die **Fehlvorstellung hinter der
+falschen Antwort** prüfen — z. B. wenn viele bei "1010 binär" die Option "8"
+gewählt haben (nur das höchstwertige Bit gezählt), soll die Wiederholungsfrage
+genau dieses Missverständnis erneut adressieren, nicht dieselbe Zahl nochmal
+abfragen. Das kann `review.js` nicht selbst leisten (es ist reine Statistik,
+kein Sprachverständnis) — die eigentliche Neuformulierung läuft über
+`ai-service.js` und den KI-Proxy aus dem nächsten Abschnitt: Für jede
+Kandidaten-Frage werden Fragetext, Optionen, richtige Antwort und die
+Verteilung der gegebenen (falschen) Antworten an `/api/generate-questions`
+übergeben, mit der Anweisung, eine neue, andersartige Frage zu erzeugen, die
+dieselbe Fehlvorstellung adressiert. Übernimmt die Lehrkraft das Ergebnis,
+legt `store.js` daraus ein neues `QuestionSet` mit `origin = "review"` und
+`sourceSessionId` an (eigene `Question`-Einträge mit neuem Text, keine Kopie
+der alten Fragen), das in der nächsten Sitzung derselben Klasse/desselben
+Fachs wie jedes andere Fragenset genutzt werden kann.
+
+**Übergangslösung ohne KI-Proxy:** Solange der Proxy nicht existiert, bietet
+`review.js`/`stats-view.js` nur die alte, wortgleiche Kopie als Platzhalter
+an (klar als solcher gekennzeichnet in der UI) — funktional nutzbar, aber
+ausdrücklich nicht das Zielverhalten.
 
 **Annahme:** Die Wiederholung erfolgt in Phase 1 klassenweise, nicht
 personalisiert pro Schüler. Eine Personalisierung über die Kartennummer wäre
@@ -376,22 +427,30 @@ oder `stats-view.js` angepasst werden müssen.
 
 ## Implementierungsplan
 
-1. Datenmodell + `store.js` (IndexedDB) implementieren, inkl.
+1. ✅ Datenmodell + `store.js` (IndexedDB) implementiert, inkl.
    `correctAnswer` und `QuestionSet.origin`.
-2. Fragen-Upload-UI + Anzeige der aktuellen Frage in `index.html`
-   integrieren.
-3. Scan-Logik an die aktuelle Frage koppeln (`quiz-runner.js`),
+2. ✅ Fragen-Upload-UI + Anzeige der aktuellen Frage in `index.html`
+   integriert.
+3. ✅ Scan-Logik an die aktuelle Frage gekoppelt (`quiz-runner.js`),
    Ergebnis-Speicherung beim Wechsel zur nächsten Frage.
-4. Statistik-Ansicht (`stats-view.js`): Filter nach Fach/Klasse, Tabelle mit
-   Verteilung inkl. Richtig/Falsch-Quote.
-5. Export-Funktion (`export.js`): Zwischenablage-Tabelle für OneNote,
-   CSV/JSON-Download.
-6. KI-Proxy (minimaler Server) + `ai-service.js`: Fragengenerierung (F8).
-7. Wiederholungslogik (`review.js`): Fehlerquote je Frage, Erzeugung von
-   Wiederholungs-Fragensets (F9).
-8. KI-Tipps für die Lehrkraft (F10), aufbauend auf dem Proxy aus Schritt 6.
-9. Präsentationsmodus (F11): Layout der Scan-Ansicht für Projektion
-   anpassen, Steuerungselemente dezent/ausblendbar machen.
-10. Optional: Verwaltung von Fächern/Klassen direkt in der App.
-11. Optional, später: Server-Sync für Mehrgeräte-Nutzung sowie
+4. ✅ Statistik-Ansicht (`stats-view.js`): Filter nach Fach/Klasse, Tabelle
+   mit Verteilung inkl. Richtig/Falsch-Quote.
+5. ✅ Export-Funktion (`export.js`): Zwischenablage-Tabelle für OneNote,
+   CSV-Download.
+6. ✅ Präsentationsmodus (F11): Layout der Scan-Ansicht für Projektion
+   angepasst, Steuerungselemente dezent/ausblendbar.
+7. ✅ Fehlerquote je Frage (`review.js`), interimsweise Wiederholungsset als
+   wortgleiche Kopie (Platzhalter, klar als solcher markiert), bis Schritt 9
+   steht. `materials.js`: Upload/Verwaltung von Unterrichtsmaterialien pro
+   Fach (IndexedDB, noch ohne KI-Anbindung).
+8. ⬜ KI-Proxy (minimaler Server) + `ai-service.js`: `/api/generate-questions`
+   (F8, inkl. Materialien als Kontext). **Blockiert auf Anbieter-/Hosting-
+   Entscheidung**, siehe "Offene Punkte".
+9. ⬜ `/api/generate-review-questions` (F9): `review.js`/`ai-service.js`
+   ersetzen die Platzhalter-Kopie aus Schritt 7 durch echte, neu formulierte
+   Fragen zur jeweiligen Fehlvorstellung.
+10. ⬜ KI-Tipps für die Lehrkraft (F10), `/api/teaching-tips`, aufbauend auf
+    dem Proxy aus Schritt 8.
+11. ⬜ Optional: Verwaltung von Fächern/Klassen direkt in der App.
+12. ⬜ Optional, später: Server-Sync für Mehrgeräte-Nutzung sowie
     Companion-Display für den Präsentationsmodus (Phase 2).

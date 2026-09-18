@@ -2,7 +2,7 @@
    Sessions, AnswerRecords. Promise-basierte API, siehe architecture.md. */
 var Store = (function () {
   var DB_NAME = "nonamequiz";
-  var DB_VERSION = 1;
+  var DB_VERSION = 2;
   var dbPromise = null;
 
   function openDb() {
@@ -37,6 +37,10 @@ var Store = (function () {
           var a = db.createObjectStore("answerRecords", { keyPath: "id" });
           a.createIndex("sessionId", "sessionId");
           a.createIndex("questionId", "questionId");
+        }
+        if (!db.objectStoreNames.contains("materials")) {
+          var m = db.createObjectStore("materials", { keyPath: "id" });
+          m.createIndex("subjectId", "subjectId");
         }
       };
 
@@ -128,6 +132,19 @@ var Store = (function () {
       if (existing) return existing;
       var subject = { id: newId(), name: trimmed };
       return put("subjects", subject);
+    });
+  }
+
+  function findSubjectByName(name) {
+    var trimmed = (name || "").trim();
+    if (!trimmed) return Promise.resolve(null);
+
+    return listSubjects().then(function (subjects) {
+      return (
+        subjects.filter(function (s) {
+          return s.name.toLowerCase() === trimmed.toLowerCase();
+        })[0] || null
+      );
     });
   }
 
@@ -277,10 +294,34 @@ var Store = (function () {
     });
   }
 
+  // --- Materials (Unterrichtsmaterialien, Kontext für spätere KI-Nutzung) --
+
+  function saveMaterial(data) {
+    // data: { subjectId, filename, mimeType, blob }
+    var material = {
+      id: newId(),
+      subjectId: data.subjectId,
+      filename: data.filename,
+      mimeType: data.mimeType,
+      blob: data.blob,
+      uploadedAt: new Date().toISOString(),
+    };
+    return put("materials", material);
+  }
+
+  function listMaterialsForSubject(subjectId) {
+    return getAllByIndex("materials", "subjectId", subjectId);
+  }
+
+  function deleteMaterial(materialId) {
+    return remove("materials", materialId);
+  }
+
   return {
     newId: newId,
     listSubjects: listSubjects,
     findOrCreateSubject: findOrCreateSubject,
+    findSubjectByName: findSubjectByName,
     listClassGroups: listClassGroups,
     findOrCreateClassGroup: findOrCreateClassGroup,
     saveQuestionSet: saveQuestionSet,
@@ -293,5 +334,8 @@ var Store = (function () {
     saveAnswerRecords: saveAnswerRecords,
     listAnswerRecordsForSession: listAnswerRecordsForSession,
     listAnswerRecordsForQuestion: listAnswerRecordsForQuestion,
+    saveMaterial: saveMaterial,
+    listMaterialsForSubject: listMaterialsForSubject,
+    deleteMaterial: deleteMaterial,
   };
 })();

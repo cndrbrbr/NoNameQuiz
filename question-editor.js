@@ -42,47 +42,65 @@ var QuestionEditor = (function () {
     });
   }
 
+  function saveUploadedSet(data, origin) {
+    return Store.findOrCreateSubject(data.subject)
+      .then(function (subject) {
+        return Store.saveQuestionSet({
+          title: data.title,
+          subjectId: subject.id,
+          origin: origin || "manual",
+          questions: data.questions.map(function (q) {
+            return {
+              text: q.text,
+              optionA: q.options.A,
+              optionB: q.options.B,
+              optionC: q.options.C,
+              optionD: q.options.D,
+              correctAnswer: q.correctAnswer,
+            };
+          }),
+        });
+      })
+      .then(function (questionSet) {
+        setMessage('Fragenset "' + questionSet.title + '" gespeichert.', false);
+        notifyChanged();
+        renderQuestionSetList();
+        return questionSet;
+      })
+      .catch(function (err) {
+        setMessage("Fehler beim Speichern: " + err.message, true);
+        throw err;
+      });
+  }
+
   function handleJsonFile(file) {
     var reader = new FileReader();
     reader.onload = function () {
       try {
         var data = JSON.parse(reader.result);
         validateUploadedSet(data);
-
-        Store.findOrCreateSubject(data.subject)
-          .then(function (subject) {
-            return Store.saveQuestionSet({
-              title: data.title,
-              subjectId: subject.id,
-              origin: "manual",
-              questions: data.questions.map(function (q) {
-                return {
-                  text: q.text,
-                  optionA: q.options.A,
-                  optionB: q.options.B,
-                  optionC: q.options.C,
-                  optionD: q.options.D,
-                  correctAnswer: q.correctAnswer,
-                };
-              }),
-            });
-          })
-          .then(function (questionSet) {
-            setMessage(
-              'Fragenset "' + questionSet.title + '" gespeichert.',
-              false
-            );
-            notifyChanged();
-            renderQuestionSetList();
-          })
-          .catch(function (err) {
-            setMessage("Fehler beim Speichern: " + err.message, true);
-          });
+        saveUploadedSet(data, "manual").catch(function () {});
       } catch (err) {
         setMessage("Fehler im JSON: " + err.message, true);
       }
     };
     reader.readAsText(file);
+  }
+
+  function loadSampleQuestionSet(url) {
+    setMessage("Lade Beispiel-Fragenset …", false);
+    fetch(url)
+      .then(function (response) {
+        if (!response.ok) throw new Error("Konnte " + url + " nicht laden");
+        return response.json();
+      })
+      .then(function (data) {
+        validateUploadedSet(data);
+        return saveUploadedSet(data, "manual");
+      })
+      .catch(function (err) {
+        setMessage("Fehler: " + err.message, true);
+      });
   }
 
   // --- Manuelles Formular ------------------------------------------------
@@ -257,6 +275,7 @@ var QuestionEditor = (function () {
 
   return {
     handleJsonFile: handleJsonFile,
+    loadSampleQuestionSet: loadSampleQuestionSet,
     addQuestionRow: addQuestionRow,
     removeQuestionRow: removeQuestionRow,
     saveManualQuestionSet: saveManualQuestionSet,

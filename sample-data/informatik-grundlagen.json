@@ -1,0 +1,86 @@
+{
+  "title": "Informatik Grundlagen – Testfragen",
+  "subject": "Informatik",
+  "questions": [
+    {
+      "text": "Was stellt die Bitfolge 1010 im Dezimalsystem dar?",
+      "options": {
+        "A": "8",
+        "B": "10",
+        "C": "1010",
+        "D": "4"
+      },
+      "correctAnswer": "B"
+    },
+    {
+      "text": "Ein Algorithmus mit Laufzeit O(n²) verarbeitet 10 Elemente in 1 Sekunde. Wie lange dauert es ungefähr bei 100 Elementen?",
+      "options": {
+        "A": "10 Sekunden",
+        "B": "100 Sekunden",
+        "C": "1 Sekunde",
+        "D": "1000 Sekunden"
+      },
+      "correctAnswer": "B"
+    },
+    {
+      "text": "In den meisten Programmiersprachen wird eine Variable a per b = a einer anderen Variable zugewiesen (einfacher Datentyp, z. B. Zahl). Was passiert danach, wenn sich a ändert?",
+      "options": {
+        "A": "b ändert sich automatisch mit, weil b und a dauerhaft dasselbe meinen",
+        "B": "b bleibt beim zuvor kopierten Wert, Änderungen an a wirken sich nicht auf b aus",
+        "C": "a wird gelöscht und existiert nur noch unter dem Namen b",
+        "D": "Es entsteht ein Fehler, weil b vorher nicht deklariert war"
+      },
+      "correctAnswer": "B"
+    },
+    {
+      "text": "Was kann ein einzelnes Bit speichern?",
+      "options": {
+        "A": "eine Ziffer von 0 bis 9",
+        "B": "einen von zwei Zuständen (0 oder 1)",
+        "C": "ein einzelnes Zeichen wie \"A\"",
+        "D": "beliebig viele Werte, je nach Bedarf"
+      },
+      "correctAnswer": "B"
+    },
+    {
+      "text": "Warum arbeiten Computer intern mit dem Binärsystem (0/1) statt direkt mit dem Dezimalsystem?",
+      "options": {
+        "A": "Weil Computer nur bis 2 zählen können",
+        "B": "Weil elektronische Schaltungen zwei stabile Zustände (Strom an/aus) technisch einfach und zuverlässig unterscheiden können",
+        "C": "Weil es historisch zufällig so entstanden ist und nie geändert wurde",
+        "D": "Weil Binärzahlen grundsätzlich kürzer sind als Dezimalzahlen"
+      },
+      "correctAnswer": "B"
+    },
+    {
+      "text": "Was ist ein \"Bug\" im Programmcode?",
+      "options": {
+        "A": "ein Computervirus",
+        "B": "ein Fehler im Programm, der zu falschem oder unerwartetem Verhalten führt",
+        "C": "eine absichtlich eingebaute Sicherheitslücke",
+        "D": "eine Warnung, die das Programm automatisch selbst behebt"
+      },
+      "correctAnswer": "B"
+    },
+    {
+      "text": "Was bedeutet es, wenn ein Algorithmus \"rekursiv\" ist?",
+      "options": {
+        "A": "Er läuft besonders schnell",
+        "B": "Er ruft sich selbst (direkt oder indirekt) auf, um ein Problem zu lösen",
+        "C": "Er wiederholt sich mit einer festen Anzahl an Schleifendurchläufen",
+        "D": "Er funktioniert nur bei Zahlen, nicht bei anderen Daten"
+      },
+      "correctAnswer": "B"
+    },
+    {
+      "text": "Zwei Geräte im selben WLAN kommunizieren miteinander. Womit werden sie im Netzwerk eindeutig identifiziert?",
+      "options": {
+        "A": "mit dem Gerätenamen, den der Hersteller vergeben hat",
+        "B": "mit einer IP-Adresse (und MAC-Adresse) im Netzwerk",
+        "C": "mit dem WLAN-Passwort, das beim Verbinden eingegeben wurde",
+        "D": "gar nicht – das WLAN sendet ohnehin an alle Geräte denselben Inhalt"
+      },
+      "correctAnswer": "B"
+    }
+  ]
+}
