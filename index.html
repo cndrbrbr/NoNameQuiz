@@ -128,13 +128,24 @@
       }
     }
 
+    var cameraRequested = false;
+
     function initCamera() {
+      cameraRequested = true;
+
       var startBtn = document.getElementById("cameraStartBtn");
       if (startBtn) startBtn.disabled = true;
 
       video = document.getElementById("video");
       canvas = document.getElementById("canvas");
       context = canvas.getContext("2d");
+
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(function (t) {
+          t.stop();
+        });
+        video.srcObject = null;
+      }
 
       canvas.width = 640;
       canvas.height = 480;
@@ -207,20 +218,21 @@
 
     // Beobachtet: Auf manchen mobilen Browsern (u.a. Samsung Internet)
     // liefert ein bereits laufender Kamera-Stream erst nach einem
-    // App-Fokuswechsel tatsächlich Bilder. Das bildet automatisch nach, was
-    // der manuelle App-Wechsel bewirkt, statt es dem Publikum abzuverlangen.
-    function resumeCameraIfNeeded() {
-      if (!video || !video.srcObject) return;
-      if (video.paused) {
-        video.play().catch(function () {});
-      }
+    // App-Fokuswechsel tatsächlich Bilder – Rotieren allein reicht nicht,
+    // video.play() erneut aufzurufen ebenfalls nicht (der Stream gilt aus
+    // Sicht des Browsers bereits als "läuft", nur ohne Frames anzukommen).
+    // Vermutlich bindet Android die Kamera-Surface erst beim App-Wechsel neu.
+    // Deshalb: Stream bei Fokus-Rückkehr komplett neu anfordern (wie ein
+    // manueller App-Wechsel es bewirkt), statt nur play() zu wiederholen.
+    function restartCameraIfNeeded() {
+      if (!cameraRequested) return;
+      initCamera();
     }
     document.addEventListener("visibilitychange", function () {
-      if (document.visibilityState === "visible") resumeCameraIfNeeded();
+      if (document.visibilityState === "visible") restartCameraIfNeeded();
     });
-    window.addEventListener("focus", resumeCameraIfNeeded);
-    window.addEventListener("pageshow", resumeCameraIfNeeded);
-    window.addEventListener("orientationchange", resumeCameraIfNeeded);
+    window.addEventListener("focus", restartCameraIfNeeded);
+    window.addEventListener("pageshow", restartCameraIfNeeded);
 
     function tick() {
       requestAnimationFrame(tick);
