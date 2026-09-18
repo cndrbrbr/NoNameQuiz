@@ -38,25 +38,27 @@
        Ergebnisse darunter aus dem sichtbaren Bereich schiebt. */
     #canvas { width: 100%; max-width: 480px; max-height: 30vh; height: auto; }
 
-    .scan-main { max-width: 640px; margin: 0 auto; }
-    .scan-side { max-width: 640px; margin: 0 auto; }
+    .scan-camera { max-width: 640px; margin: 0 auto; }
+    .scan-info { max-width: 640px; margin: 0 auto; }
 
-    /* Querformat (Handy gedreht = fürs Smartboard-Mirroring): zweispaltig
-       statt lang gestapelt, damit die Breite eines 16:9-Screens genutzt wird. */
+    /* Querformat (Handy gedreht = fürs Smartboard-Mirroring): Kamerabild am
+       linken Rand, Frage/Steuerung/Statistik rechts daneben, statt lang
+       gestapelt – nutzt die Breite eines 16:9-Screens. */
     @media (orientation: landscape) {
       .scan-layout {
         display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
         align-items: flex-start;
-        gap: 24px;
+        gap: 16px;
         text-align: left;
+        width: 100%;
       }
-      .scan-main { flex: 2 1 480px; }
-      .scan-side { flex: 1 1 280px; max-width: 320px; }
-      #canvas { max-width: 280px; max-height: 45vh; }
-      #questionText { font-size: 28px; }
-      #questionOptionsDisplay div { font-size: 20px; }
+      .scan-camera { flex: 0 0 auto; width: 38%; max-width: 320px; margin: 0; }
+      .scan-info { flex: 1 1 auto; min-width: 0; margin: 0; }
+      #canvas { max-width: 100%; max-height: 60vh; }
+      #questionText { font-size: 26px; }
+      #questionOptionsDisplay div { font-size: 18px; }
     }
 
     body.presentation-mode #questionText { font-size: 42px; }
@@ -202,6 +204,23 @@
         dictionaryName: "ARUCO"
       });
     }
+
+    // Beobachtet: Auf manchen mobilen Browsern (u.a. Samsung Internet)
+    // liefert ein bereits laufender Kamera-Stream erst nach einem
+    // App-Fokuswechsel tatsächlich Bilder. Das bildet automatisch nach, was
+    // der manuelle App-Wechsel bewirkt, statt es dem Publikum abzuverlangen.
+    function resumeCameraIfNeeded() {
+      if (!video || !video.srcObject) return;
+      if (video.paused) {
+        video.play().catch(function () {});
+      }
+    }
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") resumeCameraIfNeeded();
+    });
+    window.addEventListener("focus", resumeCameraIfNeeded);
+    window.addEventListener("pageshow", resumeCameraIfNeeded);
+    window.addEventListener("orientationchange", resumeCameraIfNeeded);
 
     function tick() {
       requestAnimationFrame(tick);
@@ -510,13 +529,7 @@
       <div style="margin: 10px;"><strong>NoNameQuiz</strong></div>
 
       <div class="scan-layout">
-        <div class="scan-main">
-          <div id="questionDisplayPanel" style="display:none;">
-            <div id="questionProgress"></div>
-            <div id="questionText" style="font-weight:bold;font-size:20px;"></div>
-            <div id="questionOptionsDisplay"></div>
-          </div>
-
+        <div class="scan-camera">
           <div id="cameraStatus" style="display:none;font-weight:bold;"></div>
           <button id="cameraStartBtn" type="button" onclick="initCamera()" style="font-size:18px;padding:10px;">
             Kamera starten
@@ -524,25 +537,33 @@
 
           <video id="video" autoplay muted playsinline></video>
           <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="scan-info">
+          <div id="questionDisplayPanel" style="display:none;">
+            <div id="questionProgress"></div>
+            <div id="questionText" style="font-weight:bold;font-size:20px;"></div>
+            <div id="questionOptionsDisplay"></div>
+          </div>
+
+          <div class="teacher-controls">
+            <div id="scanSetupPanel">
+              <input type="text" id="scanSubjectInput" list="subjectsDatalist" placeholder="Fach">
+              <input type="text" id="scanClassInput" list="classGroupsDatalist" placeholder="Klasse">
+              <br>
+              <select id="scanQuestionSetSelect"></select>
+              <button type="button" onclick="handleStartSession()">Sitzung starten</button>
+              <div id="scanMessage"></div>
+            </div>
+
+            <div id="scanSessionPanel" style="display:none;">
+              <button type="button" onclick="handleNextQuestion()">Nächste Frage</button>
+              <button type="button" onclick="handleEndSession()">Sitzung beenden</button>
+            </div>
+          </div>
 
           <div id="results">
             Die Runde ist eröffnet
-          </div>
-        </div>
-
-        <div class="scan-side teacher-controls">
-          <div id="scanSetupPanel">
-            <input type="text" id="scanSubjectInput" list="subjectsDatalist" placeholder="Fach">
-            <input type="text" id="scanClassInput" list="classGroupsDatalist" placeholder="Klasse">
-            <br>
-            <select id="scanQuestionSetSelect"></select>
-            <button type="button" onclick="handleStartSession()">Sitzung starten</button>
-            <div id="scanMessage"></div>
-          </div>
-
-          <div id="scanSessionPanel" style="display:none;">
-            <button type="button" onclick="handleNextQuestion()">Nächste Frage</button>
-            <button type="button" onclick="handleEndSession()">Sitzung beenden</button>
           </div>
 
           <div id="attendance">
@@ -553,19 +574,21 @@
             Alle dabei!
           </div>
 
-          <button id="lockButton" onclick="lockAttendance()" style="font-size:18px;padding:10px;margin:4px;">
-            Team steht fest
-          </button>
+          <div class="teacher-controls">
+            <button id="lockButton" onclick="lockAttendance()" style="font-size:18px;padding:10px;margin:4px;">
+              Team steht fest
+            </button>
 
-          <button id="editButton" onclick="editAttendance()"
-            style="display:none;font-size:18px;padding:10px;margin:4px;">
-            Team ändern
-          </button>
+            <button id="editButton" onclick="editAttendance()"
+              style="display:none;font-size:18px;padding:10px;margin:4px;">
+              Team ändern
+            </button>
 
-          <div id="attendanceEditor" style="display:none;">
-            <p>Team ändern:</p>
-            <input id="attendanceChanges" type="text" placeholder="+17 -18 -94">
-            <button onclick="applyAttendanceChanges()">Übernehmen</button>
+            <div id="attendanceEditor" style="display:none;">
+              <p>Team ändern:</p>
+              <input id="attendanceChanges" type="text" placeholder="+17 -18 -94">
+              <button onclick="applyAttendanceChanges()">Übernehmen</button>
+            </div>
           </div>
         </div>
       </div>
