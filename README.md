@@ -7,8 +7,11 @@ watches the room, recognizes each card by its marker ID, and reads the answer
 a question is just a matter of rotating your card.
 
 Built on top of [js-aruco2](https://damianofalcioni.github.io/js-aruco2/) for marker
-detection. Everything runs client-side in the browser; there is no backend or build
-step.
+detection. Questions, sessions, and results are stored locally in the browser via
+IndexedDB. Everything runs client-side; there is no backend or build step (see
+[features.md](features.md) and [architecture.md](architecture.md) for the full
+feature/architecture rationale — a couple of optional AI features described there
+aren't built yet, see the note at the end of this file).
 
 ## Requirements
 
@@ -59,32 +62,90 @@ they want to answer.
 
 ## Usage
 
-1. Open the app and point the camera at the room. Any marker card that comes into
-   view is automatically added to **"Wer spielt mit?"** (who's playing) as active
-   attendance.
-2. Click **"Team steht fest"** ("team is set") to lock in the current attendance list.
-   From this point on, only confirmed cards are tracked for answers.
-3. Show a quiz question to the room. Participants rotate their card to the corner
-   matching their answer (A/B/C/D) and hold it up toward the camera.
-4. The app continuously reads visible cards and updates:
-   - **Ergebnisse** — each participant's card ID and their currently detected answer.
+The app has three tabs: **Fragen** (questions), **Scan** (live quiz), and
+**Statistik** (results). It opens on the **Scan** tab and asks for camera access
+immediately, same as before.
+
+### 1. Fragen — prepare a question set
+
+- **Upload as JSON**: a file with a `title`, a `subject`, and a `questions` array,
+  each question giving `text`, `options.A`–`options.D`, and `correctAnswer`
+  (`"A"`–`"D"`) — see the example in [architecture.md](architecture.md#format-für-den-fragen-upload-json).
+- **Or build one manually**: enter a title and subject, click **"Frage
+  hinzufügen"** to add question rows (text + four options + which one is
+  correct), then **"Fragenset speichern"**.
+- Existing question sets are listed below the form and can be reused across
+  sessions/classes.
+
+### 2. Scan — run a live round
+
+1. Enter **Fach** (subject) and **Klasse** (class) — existing ones are
+   suggested, new ones are created on the fly — pick a **Fragenset**, and click
+   **"Sitzung starten"** (start session).
+2. Point the camera at the room. Any marker card that comes into view is
+   automatically added to **"Wer spielt mit?"** as active attendance.
+3. Click **"Team steht fest"** to lock in the current attendance list; only
+   confirmed cards are then tracked for answers. Use **"Team ändern"** to
+   reopen the roster (people joining/leaving), including the manual
+   `+17 -18 -94` editor described below.
+4. The current question and its A–D options are shown above the camera view.
+   Participants rotate their card to the corner matching their answer and hold
+   it up. The app continuously updates:
+   - **Ergebnisse** — each card's currently detected answer.
    - **Verteilung** — a live tally of how many chose A/B/C/D.
-   - **Noch offen** — which confirmed participants haven't been detected answering yet.
-5. Click **"Neue Frage"** ("new question") to clear answers and start the next round
-   (attendance stays locked).
-6. Use **"Team ändern"** ("change team") to reopen the attendance editor if people
-   join or leave. You can also manually adjust the roster by typing marker IDs into
-   the text field in the form `+17 -18 -94` (add card 17, remove cards 18 and 94) and
-   clicking **"Übernehmen"** (apply).
+   - **Noch offen** — confirmed participants not yet detected answering.
+5. Click **"Nächste Frage"** to store that question's answers and move to the
+   next one; after the last question the session is automatically marked
+   complete. **"Sitzung beenden"** ends it early at any point.
+
+### 3. Statistik — review results
+
+Filter by Fach/Klasse, pick a session from the list to see the per-question
+distribution (A/B/C/D counts and correct/total), then either:
+
+- **"In Zwischenablage kopieren (OneNote)"** — copies the result table to the
+  clipboard as an HTML table; paste (Ctrl+V) directly into a OneNote page to
+  get a native table there.
+- **"CSV herunterladen"** — downloads the same data as a CSV file (fallback,
+  or for further processing).
+
+**"Wiederholungsset vorschlagen"** lists questions from that session with a
+high error rate (≥40% by default) and lets you turn the selected ones into a
+new "Wiederholung …" question set for the next session with that class.
+
+### Presentation mode (smartboard)
+
+The **"Präsentation an/aus"** button shrinks the teacher controls and enlarges
+the question/answers/results text, for when the phone's screen is mirrored to
+a smartboard (Miracast/AirPlay/Chromecast/HDMI) so the room sees question,
+answer options, camera feed, and live results together. See
+[architecture.md](architecture.md#präsentationsmodus-smartboard) for why this
+doesn't need a second device/app.
+
+### Not implemented yet
+
+Two features from [features.md](features.md) need an external AI API key and a
+small server-side proxy to call it safely (an API key can't live in this
+static page's client-side JS) and aren't wired up yet: **F8** (AI-generated
+question sets from a topic) and **F10** (AI tips for the teacher based on
+error patterns). See [architecture.md](architecture.md#ki-komponente-fragengenerierung--tipps)
+for the planned shape once a provider/hosting choice is made.
 
 ## Project structure
 
 ```
-index.html   — the app (UI, camera loop, marker → answer logic)
-aruco.js     — vendored js-aruco2 marker detector
-cv.js        — vendored computer-vision helpers used by aruco.js
-polyfill.js  — getUserMedia / browser compatibility shims
-history/     — archived earlier iterations of index.html, kept for reference
+index.html         — app shell, tabs, camera loop, marker → answer logic
+store.js            — IndexedDB data layer (subjects, classes, question sets,
+                       questions, sessions, answer records)
+question-editor.js  — question set upload (JSON) and manual builder
+quiz-runner.js      — session/question flow, ties scanning to the active question
+stats-view.js       — results browser (filter, per-question breakdown)
+export.js           — clipboard HTML-table copy + CSV download
+review.js           — error-rate calculation and review-set generation
+aruco.js            — vendored js-aruco2 marker detector
+cv.js               — vendored computer-vision helpers used by aruco.js
+polyfill.js         — getUserMedia / browser compatibility shims
+history/            — archived earlier iterations of index.html, kept for reference
 ```
 
 ## Credits

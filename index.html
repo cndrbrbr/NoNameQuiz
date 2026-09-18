@@ -2,91 +2,133 @@
 <html>
 
 <head>
-  <title>Augmented Reality Marker Detector</title>
+  <title>NoNameQuiz</title>
 
   <script src="polyfill.js"></script>
   <script src="cv.js"></script>
   <script src="aruco.js"></script>
-  
- 
+  <script src="store.js"></script>
+  <script src="export.js"></script>
+  <script src="review.js"></script>
+  <script src="question-editor.js"></script>
+  <script src="quiz-runner.js"></script>
+  <script src="stats-view.js"></script>
+
+  <style>
+    body { font-family: monospace; }
+    .tab-button { font-size: 16px; padding: 8px 14px; margin: 2px; }
+    .tab-button.active { font-weight: bold; text-decoration: underline; }
+    table { margin: 8px auto; }
+    #qsQuestionsContainer, #viewFragen, #viewStatistik { text-align: left; max-width: 640px; margin: 0 auto; }
+
+    body.presentation-mode #questionText { font-size: 42px; }
+    body.presentation-mode #questionOptionsDisplay div { font-size: 28px; }
+    body.presentation-mode #results,
+    body.presentation-mode #attendance,
+    body.presentation-mode #missing { font-size: 20px; }
+    body.presentation-mode .teacher-controls,
+    body.presentation-mode #tabs { transform: scale(0.6); opacity: 0.5; transition: opacity 0.2s, transform 0.2s; }
+    body.presentation-mode .teacher-controls:hover,
+    body.presentation-mode .teacher-controls:focus-within,
+    body.presentation-mode #tabs:hover { opacity: 1; transform: none; }
+  </style>
+
   <script>
     var video, canvas, context, imageData, detector;
-    var responses = {};
     var activeCards = {};
-    
     var confirmedCards = {};
     var attendanceLocked = false;
-      
-    function onLoad(){
-     
+    var cameraInitialized = false;
+
+    // --- Tabs / Präsentationsmodus ---------------------------------------
+
+    function showView(name) {
+      document.getElementById("viewFragen").style.display = name === "fragen" ? "block" : "none";
+      document.getElementById("viewScan").style.display = name === "scan" ? "block" : "none";
+      document.getElementById("viewStatistik").style.display = name === "statistik" ? "block" : "none";
+
+      document.querySelectorAll(".tab-button").forEach(function (btn) {
+        btn.classList.toggle("active", btn.dataset.view === name);
+      });
+
+      if (name === "scan" && !cameraInitialized) {
+        cameraInitialized = true;
+        initCamera();
+      }
+      if (name === "fragen") {
+        QuestionEditor.renderQuestionSetList();
+      }
+      if (name === "statistik") {
+        StatsView.populateFilters();
+        StatsView.loadSessions();
+      }
+    }
+
+    function togglePresentationMode() {
+      document.body.classList.toggle("presentation-mode");
+    }
+
+    // --- Kamera / ArUco-Erkennung (bestehende Logik) ----------------------
+
+    function initCamera() {
       video = document.getElementById("video");
       canvas = document.getElementById("canvas");
       context = canvas.getContext("2d");
-    
+
       canvas.width = parseInt(canvas.style.width);
       canvas.height = parseInt(canvas.style.height);
-      
+
       if (navigator.mediaDevices === undefined) {
         navigator.mediaDevices = {};
       }
-      
+
       if (navigator.mediaDevices.getUserMedia === undefined) {
-        navigator.mediaDevices.getUserMedia = function(constraints) {
+        navigator.mediaDevices.getUserMedia = function (constraints) {
           var getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
-          
+
           if (!getUserMedia) {
-            return Promise.reject(new Error('getUserMedia is not implemented in this browser'));
+            return Promise.reject(new Error("getUserMedia is not implemented in this browser"));
           }
 
-          return new Promise(function(resolve, reject) {
+          return new Promise(function (resolve, reject) {
             getUserMedia.call(navigator, constraints, resolve, reject);
           });
-        }
+        };
       }
-      
+
       navigator.mediaDevices
-        
         .getUserMedia({
-           video: {
-             facingMode: "environment"
-           }
-         })
-      
-        .then(function(stream) {
+          video: {
+            facingMode: "environment"
+          }
+        })
+        .then(function (stream) {
           if ("srcObject" in video) {
             video.srcObject = stream;
           } else {
             video.src = window.URL.createObjectURL(stream);
           }
-          
-          video.onloadedmetadata = function() {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-               video.play();
-               requestAnimationFrame(tick);
+
+          video.onloadedmetadata = function () {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            video.play();
+            requestAnimationFrame(tick);
           };
         })
-      
-        .catch(function(err) {
-       
+        .catch(function (err) {
           alert(err.name + ": " + err.message);
         });
 
-            
       detector = new AR.Detector({
-        dictionaryName: 'ARUCO'
+        dictionaryName: "ARUCO"
       });
-      
-  
-      // requestAnimationFrame(tick);
-   
     }
-    
-    function tick(){
-    
+
+    function tick() {
       requestAnimationFrame(tick);
-     
-      if (video.readyState === video.HAVE_ENOUGH_DATA){
+
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
         snapshot();
 
         var markers = detector.detect(imageData);
@@ -95,24 +137,23 @@
       }
     }
 
-    function snapshot(){
+    function snapshot() {
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-   
       imageData = context.getImageData(0, 0, canvas.width, canvas.height);
     }
-          
-    function drawCorners(markers){
+
+    function drawCorners(markers) {
       var corners, corner, i, j;
-    
+
       context.lineWidth = 3;
 
-      for (i = 0; i !== markers.length; ++ i){
+      for (i = 0; i !== markers.length; ++i) {
         corners = markers[i].corners;
-        
+
         context.strokeStyle = "red";
         context.beginPath();
-        
-        for (j = 0; j !== corners.length; ++ j){
+
+        for (j = 0; j !== corners.length; ++j) {
           corner = corners[j];
           context.moveTo(corner.x, corner.y);
           corner = corners[(j + 1) % corners.length];
@@ -121,261 +162,334 @@
 
         context.stroke();
         context.closePath();
-        
+
         context.strokeStyle = "green";
         context.strokeRect(corners[0].x - 2, corners[0].y - 2, 4, 4);
       }
     }
 
-    function drawId(markers){
+    function drawId(markers) {
       var corners, corner, x, y, i, j;
-      
+
       context.strokeStyle = "blue";
       context.lineWidth = 1;
-      
-      for (i = 0; i !== markers.length; ++ i){
-        if (markers[i].id === 0){
+
+      for (i = 0; i !== markers.length; ++i) {
+        if (markers[i].id === 0) {
           continue;
         }
-        
+
         activeCards[markers[i].id] = true;
-        
-         if (!attendanceLocked || confirmedCards[markers[i].id]){
-           responses[markers[i].id] = getAnswer(markers[i]);
-         }
-           
+
+        if (!attendanceLocked || confirmedCards[markers[i].id]) {
+          QuizRunner.recordAnswer(markers[i].id, getAnswer(markers[i]));
+        }
+
         updateResults();
-           
+
         corners = markers[i].corners;
-        
+
         x = Infinity;
         y = Infinity;
-        
-        for (j = 0; j !== corners.length; ++ j){
+
+        for (j = 0; j !== corners.length; ++j) {
           corner = corners[j];
-          
+
           x = Math.min(x, corner.x);
           y = Math.min(y, corner.y);
         }
 
         context.strokeText(
-         markers[i].id + " : " + getAnswer(markers[i]),
-         x,
-         y
-       );
+          markers[i].id + " : " + getAnswer(markers[i]),
+          x,
+          y
+        );
       }
     }
-  
-    function getAnswer(marker){
-        var corners = marker.corners;
-        var topIndex = 0;
-        var topY = corners[0].y;
-       for (var i = 1; i < 4; i++){
-         if (corners[i].y < topY){
-         topY = corners[i].y;
-        topIndex = i;
+
+    function getAnswer(marker) {
+      var corners = marker.corners;
+      var topIndex = 0;
+      var topY = corners[0].y;
+      for (var i = 1; i < 4; i++) {
+        if (corners[i].y < topY) {
+          topY = corners[i].y;
+          topIndex = i;
+        }
       }
+      switch (topIndex) {
+        case 0:
+          return "A";
+        case 1:
+          return "B";
+        case 2:
+          return "C";
+        case 3:
+          return "D";
+      }
+
+      return "?";
     }
-     switch(topIndex){
-     case 0:
-       return "A";
-     case 1:
-      return "B";
-     case 2:
-      return "C";
-     case 3:
-      return "D";
-     }
 
-   return "?";
-    }
+    // --- Anwesenheit + Ergebnisanzeige (an QuizRunner gekoppelt) ----------
 
+    function updateResults() {
+      var responses = QuizRunner.getResponses();
+      var text = "";
+      var attendanceText = "";
+      var missingText = "";
+      var counts = {
+        A: 0,
+        B: 0,
+        C: 0,
+        D: 0
+      };
 
-    
-   function updateResults()
-   {
-     var text = "";
-     var attendanceText = "";
-     var missingText = "";
-     var counts = {
-       A: 0,
-       B: 0,
-       C: 0,
-       D: 0
-     };
-     
-     for (var id in responses){
-       text += id + " = " + responses[id] + "<br>";
-       counts[responses[id]]++;
-     }
+      for (var id in responses) {
+        text += id + " = " + responses[id] + "<br>";
+        counts[responses[id]]++;
+      }
 
+      var cardsToShow = attendanceLocked ? confirmedCards : activeCards;
 
-     var cardsToShow = attendanceLocked
-         ? confirmedCards
-         : activeCards;
- 
-    for (var id in cardsToShow){
-
+      for (var id in cardsToShow) {
         attendanceText += id + "<br>";
 
-        if (!(id in responses)){
+        if (!(id in responses)) {
           missingText += id + "<br>";
         }
-}
-    
+      }
 
-     if (text === ""){
-       text = "Die Runde ist eröffnet";
-     }
-     if (missingText === ""){
-       missingText = "Alle dabei!";
-     }
-     var summaryText =
-       "A: " + counts.A + "<br>" +
-       "B: " + counts.B + "<br>" +
-       "C: " + counts.C + "<br>" +
-       "D: " + counts.D;
-     
-     if (attendanceLocked){
-          document.getElementById("results").innerHTML =
-               "<h3>Ergebnisse</h3>" + text +
-            "<br><br><h3>Verteilung</h3>" +
-            summaryText;
-       }
-       else{
-          document.getElementById("results").innerHTML = "";
-         }
-     
-     document.getElementById("attendance").innerHTML = 
-              "<h3>Wer spielt mit?</h3>" + attendanceText;
-     
-     if (attendanceLocked){
-          document.getElementById("missing").innerHTML =
-            "<h3>Noch offen</h3>" + missingText;
-       }
-       else{
-          document.getElementById("missing").innerHTML = "";
-        }
+      if (text === "") {
+        text = "Die Runde ist eröffnet";
+      }
+      if (missingText === "") {
+        missingText = "Alle dabei!";
+      }
+      var summaryText =
+        "A: " + counts.A + "<br>" +
+        "B: " + counts.B + "<br>" +
+        "C: " + counts.C + "<br>" +
+        "D: " + counts.D;
+
+      if (attendanceLocked) {
+        document.getElementById("results").innerHTML =
+          "<h3>Ergebnisse</h3>" + text +
+          "<br><br><h3>Verteilung</h3>" +
+          summaryText;
+      } else {
+        document.getElementById("results").innerHTML = "";
+      }
+
+      document.getElementById("attendance").innerHTML =
+        "<h3>Wer spielt mit?</h3>" + attendanceText;
+
+      if (attendanceLocked) {
+        document.getElementById("missing").innerHTML =
+          "<h3>Noch offen</h3>" + missingText;
+      } else {
+        document.getElementById("missing").innerHTML = "";
+      }
     }
 
-    function lockAttendance()
-    {
-      confirmedCards = {...activeCards};
+    function lockAttendance() {
+      confirmedCards = { ...activeCards };
       attendanceLocked = true;
       document.getElementById("lockButton").style.display = "none";
-      document.getElementById("questionButton").style.display = "inline";
       document.getElementById("editButton").style.display = "inline";
       document.getElementById("attendanceEditor").style.display = "none";
+      updateResults();
     }
 
-    function editAttendance()
-    {
+    function editAttendance() {
       attendanceLocked = false;
       document.getElementById("lockButton").style.display = "inline";
-      document.getElementById("questionButton").style.display = "none";
       document.getElementById("editButton").style.display = "none";
       document.getElementById("attendanceEditor").style.display = "block";
+      updateResults();
     }
 
-    function applyAttendanceChanges()
-    {
-      var changes =
-          document.getElementById("attendanceChanges").value;
-      var matches =
-          changes.match(/[+-]\d+/g);
-      if (!matches){
-           return;
-       }
-      for (var i = 0; i < matches.length; i++){
-          var item = matches[i];
-          var number = 
-            parseInt(item.substring(1));
+    function applyAttendanceChanges() {
+      var changes = document.getElementById("attendanceChanges").value;
+      var matches = changes.match(/[+-]\d+/g);
+      if (!matches) {
+        return;
+      }
+      for (var i = 0; i < matches.length; i++) {
+        var item = matches[i];
+        var number = parseInt(item.substring(1));
 
-      if (item.startsWith("+")){
-         activeCards[number] = true;
-       }
-       if (item.startsWith("-")){
+        if (item.startsWith("+")) {
+          activeCards[number] = true;
+        }
+        if (item.startsWith("-")) {
           delete activeCards[number];
           delete confirmedCards[number];
-          delete responses[number];
-       }
+        }
       }
-      document.getElementById(
-          "attendanceChanges"
-      ).value = "";
+      document.getElementById("attendanceChanges").value = "";
       updateResults();
     }
 
-    
-    function newQuestion()
-    {
-      responses = {};
-      showAttendanceEditor = false;
+    // --- Sitzungssteuerung (QuizRunner) ------------------------------------
+
+    function handleStartSession() {
+      activeCards = {};
+      confirmedCards = {};
+      attendanceLocked = false;
+      document.getElementById("lockButton").style.display = "inline";
+      document.getElementById("editButton").style.display = "none";
+      document.getElementById("attendanceEditor").style.display = "none";
+
+      QuizRunner.startSession();
       updateResults();
-      updateButtons();
     }
-    
-    window.onload = onLoad;
+
+    function handleNextQuestion() {
+      if (!QuizRunner.hasActiveSession()) {
+        alert("Bitte zuerst eine Sitzung starten.");
+        return;
+      }
+      QuizRunner.nextQuestion();
+      updateResults();
+    }
+
+    function handleEndSession() {
+      QuizRunner.endSession();
+      attendanceLocked = false;
+      document.getElementById("lockButton").style.display = "inline";
+      document.getElementById("editButton").style.display = "none";
+      document.getElementById("attendanceEditor").style.display = "none";
+      updateResults();
+    }
+
+    window.onload = function () {
+      QuizRunner.populateSelectors();
+      QuestionEditor.renderQuestionSetList();
+      showView("scan");
+    };
   </script>
 
 </head>
 
-<body style="font-family: monospace;">
+<body>
+
+  <datalist id="subjectsDatalist"></datalist>
+  <datalist id="classGroupsDatalist"></datalist>
 
   <center>
-    <div style="margin: 10px;"><strong>-= Augmented Reality Marker Detector =-</strong></div>
-    
-    <video id="video" autoplay muted playsinline style="width:640px;"></video>
 
-    <canvas id="canvas"
-            style="width:640px;">
-    </canvas>
-    
-    <div id="results">
-      Die Runde ist eröffnet
-    </div>
-    
-    <div id="attendance">
-      Wer spielt mit?
+    <div id="tabs">
+      <button class="tab-button" data-view="fragen" onclick="showView('fragen')">Fragen</button>
+      <button class="tab-button active" data-view="scan" onclick="showView('scan')">Scan</button>
+      <button class="tab-button" data-view="statistik" onclick="showView('statistik')">Statistik</button>
+      <button onclick="togglePresentationMode()" style="font-size:11px;">Präsentation an/aus</button>
     </div>
 
-    <div id="missing">
-      Alle dabei!
+    <!-- ================= Fragen ================= -->
+    <div id="viewFragen" style="display:none;">
+      <h3>Fragenset hochladen (JSON)</h3>
+      <input type="file" id="qsJsonFile" accept="application/json"
+        onchange="QuestionEditor.handleJsonFile(this.files[0])">
+
+      <h3>Fragenset manuell anlegen</h3>
+      <div>
+        <input type="text" id="qsTitle" placeholder="Titel (z.B. Mathe 7b – Bruchrechnung)" style="width:95%;">
+        <input type="text" id="qsSubject" list="subjectsDatalist" placeholder="Fach" style="width:95%;margin-top:4px;">
+      </div>
+      <div id="qsQuestionsContainer"></div>
+      <button type="button" onclick="QuestionEditor.addQuestionRow()">Frage hinzufügen</button>
+      <button type="button" onclick="QuestionEditor.saveManualQuestionSet()">Fragenset speichern</button>
+      <div id="qsMessage"></div>
+
+      <h3>Vorhandene Fragensets</h3>
+      <div id="qsList"></div>
     </div>
 
-    <button id="lockButton" 
-      onclick="lockAttendance()"
-      style="font-size:18px;padding:10px;margin:4px;">
-       Team steht fest
-    </button>
+    <!-- ================= Scan ================= -->
+    <div id="viewScan">
+      <div style="margin: 10px;"><strong>NoNameQuiz</strong></div>
 
-    <button id="editButton"
-         onclick="editAttendance()"
-         style="display:none;font-size:18px;padding:10px;margin:4px;">
-       Team ändern
-    </button>
-    
-    <button id="questionButton" 
-           onclick="newQuestion()"
-           style="display:none;font-size:18px;padding:10px;margin:4px;">
-      Neue Frage
-    </button>
+      <div id="scanSetupPanel" class="teacher-controls">
+        <input type="text" id="scanSubjectInput" list="subjectsDatalist" placeholder="Fach">
+        <input type="text" id="scanClassInput" list="classGroupsDatalist" placeholder="Klasse">
+        <br>
+        <select id="scanQuestionSetSelect"></select>
+        <button type="button" onclick="handleStartSession()">Sitzung starten</button>
+        <div id="scanMessage"></div>
+      </div>
 
-    <div id="attendanceEditor" style="display:none;">
-      <p>
-         Team ändern:
-      </p>
-      <input id="attendanceChanges"
-        type="text"
-        placeholder="+17 -18 -94">
-      <button onclick="applyAttendanceChanges()">
-         Übernehmen
-    </button>
+      <div id="scanSessionPanel" class="teacher-controls" style="display:none;">
+        <div id="questionProgress"></div>
+        <div id="questionText" style="font-weight:bold;font-size:20px;"></div>
+        <div id="questionOptionsDisplay"></div>
+        <button type="button" onclick="handleNextQuestion()">Nächste Frage</button>
+        <button type="button" onclick="handleEndSession()">Sitzung beenden</button>
+      </div>
+
+      <video id="video" autoplay muted playsinline style="width:640px;"></video>
+
+      <canvas id="canvas" style="width:640px;"></canvas>
+
+      <div id="results">
+        Die Runde ist eröffnet
+      </div>
+
+      <div id="attendance">
+        Wer spielt mit?
+      </div>
+
+      <div id="missing">
+        Alle dabei!
+      </div>
+
+      <div class="teacher-controls">
+        <button id="lockButton" onclick="lockAttendance()" style="font-size:18px;padding:10px;margin:4px;">
+          Team steht fest
+        </button>
+
+        <button id="editButton" onclick="editAttendance()"
+          style="display:none;font-size:18px;padding:10px;margin:4px;">
+          Team ändern
+        </button>
+
+        <div id="attendanceEditor" style="display:none;">
+          <p>Team ändern:</p>
+          <input id="attendanceChanges" type="text" placeholder="+17 -18 -94">
+          <button onclick="applyAttendanceChanges()">Übernehmen</button>
+        </div>
+      </div>
+
+      <div style="margin: 15px;"><strong>Powered by <a
+            href="https://damianofalcioni.github.io/js-aruco2/">js-aruco2</a></strong></div>
     </div>
-    
-    <div style="margin: 15px;"><strong>Powered by <a href="https://damianofalcioni.github.io/js-aruco2/">js-aruco2</a></strong></div>
+
+    <!-- ================= Statistik ================= -->
+    <div id="viewStatistik" style="display:none;">
+      <h3>Statistik</h3>
+
+      <select id="statsSubjectSelect" onchange="StatsView.loadSessions()"></select>
+      <select id="statsClassSelect" onchange="StatsView.loadSessions()"></select>
+      <button type="button" onclick="StatsView.loadSessions()">Aktualisieren</button>
+
+      <div id="statsSessionList"></div>
+
+      <div id="statsSessionDetail"></div>
+
+      <div>
+        <button type="button" onclick="StatsView.exportClipboard()">In Zwischenablage kopieren (OneNote)</button>
+        <button type="button" onclick="StatsView.exportCsv()">CSV herunterladen</button>
+        <div id="statsExportMessage"></div>
+      </div>
+
+      <div>
+        <button type="button" onclick="StatsView.suggestReview()">Wiederholungsset vorschlagen</button>
+        <div id="statsReviewCandidates"></div>
+      </div>
+    </div>
+
   </center>
 
 </body>
-  
+
 </html>
