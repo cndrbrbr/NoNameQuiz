@@ -149,6 +149,15 @@ werden je Fach und Klasse dauerhaft als Statistik gespeichert.
 
 ## Nicht-funktionale Anforderungen
 
+- **Datenhoheit beim Gerät der Lehrkraft:** Unterrichtsmaterialien (F8),
+  Fragensets/Fragen (F1) und alle Antworten/Statistiken (F5) werden
+  ausschließlich lokal auf dem Handy/Tablet gespeichert und verlassen es nur,
+  wenn die Lehrkraft aktiv exportiert (F6). Das einzige serverseitige
+  Bauteil der App ist die KI-Anbindung zur Fragengenerierung (F8/F9, siehe
+  auch F10) — dieser Server erzeugt bzw. bewertet Fragen, speichert aber
+  selbst nichts dauerhaft. Kein anderer Teil der App (Materialverwaltung,
+  Fragenverwaltung, Kartenerkennung, Statistik) hat einen Server im
+  regulären Betrieb nötig oder legt Daten dort ab.
 - Weiterhin ohne Build-Step nutzbar (reines HTML/JS wie bisher).
 - Kernfunktionen (Frage anzeigen, scannen, auswerten, Statistik ansehen)
   funktionieren offline auf einem Gerät. Internet wird nur für die
