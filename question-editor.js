@@ -1,6 +1,7 @@
 /* Fragenverwaltung: JSON-Upload + einfaches Formular (F1), siehe features.md. */
 var QuestionEditor = (function () {
   var rowCounter = 0;
+  var pendingOrigin = "manual";
 
   function notifyChanged() {
     document.dispatchEvent(new CustomEvent("nnq:questionsets-changed"));
@@ -201,12 +202,14 @@ var QuestionEditor = (function () {
       return;
     }
 
+    var origin = pendingOrigin;
+
     Store.findOrCreateSubject(subjectName)
       .then(function (subject) {
         return Store.saveQuestionSet({
           title: title,
           subjectId: subject.id,
-          origin: "manual",
+          origin: origin,
           questions: questions,
         });
       })
@@ -215,12 +218,42 @@ var QuestionEditor = (function () {
         document.getElementById("qsTitle").value = "";
         document.getElementById("qsSubject").value = "";
         document.getElementById("qsQuestionsContainer").innerHTML = "";
+        pendingOrigin = "manual";
         notifyChanged();
         renderQuestionSetList();
       })
       .catch(function (err) {
         setMessage("Fehler beim Speichern: " + err.message, true);
       });
+  }
+
+  // --- Übernahme eines KI-Vorschlags (F8) in das manuelle Formular -------
+  // Die KI liefert einen Entwurf im Upload-Format (siehe ai-service.js); er
+  // landet im selben Formular wie die manuelle Eingabe, damit die Lehrkraft
+  // ihn vor dem Speichern sichten/bearbeiten kann (Anforderung aus F8).
+
+  function prefillFromAi(questionSetDraft) {
+    document.getElementById("qsTitle").value = questionSetDraft.title || "";
+    document.getElementById("qsSubject").value = questionSetDraft.subject || "";
+    document.getElementById("qsQuestionsContainer").innerHTML = "";
+
+    (questionSetDraft.questions || []).forEach(function (q) {
+      addQuestionRow();
+      var rows = document.querySelectorAll(".qs-question-row");
+      var row = rows[rows.length - 1];
+      row.querySelector(".qs-text").value = q.text || "";
+      ["A", "B", "C", "D"].forEach(function (letter) {
+        row.querySelector(".qs-option-" + letter).value =
+          (q.options && q.options[letter]) || "";
+      });
+      if (q.correctAnswer) {
+        var radio = row.querySelector('.qs-correct[value="' + q.correctAnswer + '"]');
+        if (radio) radio.checked = true;
+      }
+    });
+
+    pendingOrigin = "ai";
+    document.getElementById("viewFragen").scrollIntoView({ behavior: "smooth" });
   }
 
   // --- Liste bestehender Fragensets -------------------------------------
@@ -279,6 +312,7 @@ var QuestionEditor = (function () {
     addQuestionRow: addQuestionRow,
     removeQuestionRow: removeQuestionRow,
     saveManualQuestionSet: saveManualQuestionSet,
+    prefillFromAi: prefillFromAi,
     renderQuestionSetList: renderQuestionSetList,
   };
 })();

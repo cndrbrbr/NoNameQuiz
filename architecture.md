@@ -309,17 +309,14 @@ die Lehrkraft) aus `features.md`.
   (Sub-)Domain erreichbar, die Frage ist eher Zugriffsschutz (offen im
   Internet vs. nur intern/per Token abgesichert) als Geheimhaltung eines
   Vendor-Keys.
-- Noch offen: welche Server-Software dahinter läuft (Ollama, ein
-  OpenAI-kompatibles API wie vLLM/text-generation-webui, oder etwas
-  anderes) — das bestimmt das genaue Request/Response-Format, das
-  `ai-service.js`/der Proxy sprechen muss. Die Endpunkt-Namen unten
+- **Geklärt: Server-Software ist OpenAI-kompatibel** (`/chat/completions`
+  im bekannten `messages`/`choices`-Format). Die Endpunkt-Namen unten
   (`/api/generate-questions` etc.) sind das App-seitige, stabile Interface;
-  der Proxy übersetzt intern ins tatsächliche Mistral-API-Format.
-- Ob überhaupt noch ein separater Proxy nötig ist oder die App direkt gegen
-  `mistral.cndrbrbr.de` sprechen kann, hängt davon ab, ob dort schon
-  Zugriffsschutz/CORS für Browser-Anfragen eingerichtet ist — sonst bleibt
-  ein schlanker Proxy sinnvoll, um z. B. ein Zugriffs-Token nicht im Client
-  offenzulegen und CORS zentral zu setzen.
+  der Proxy übersetzt intern ins Mistral-API-Format (`server/lib/mistralClient.js`).
+- Aktuell kein Zugriffsschutz/Token auf `mistral.cndrbrbr.de` nötig. Der
+  Proxy bleibt trotzdem sinnvoll, u. a. um CORS zentral zu setzen und um
+  bei Bedarf später ohne App-Änderung ein Zugriffs-Token einzuführen (Stelle
+  dafür ist in `server/lib/mistralClient.js` markiert).
 
 **Warum trotzdem ein schlanker Server-Proxy statt direktem Aufruf aus dem
 Browser (Empfehlung, sofern `mistral.cndrbrbr.de` keinen offenen,
@@ -333,21 +330,20 @@ Empfehlung: eine einzelne kleine Funktion (Cloudflare Worker, Netlify/Vercel
 Function, oder eine einzelne Express-Route — ggf. direkt auf demselben
 Server wie Mistral), drei Endpunkte:
 
-- `POST /api/generate-questions` — Body: `{ topic, subject, count, materials? }`.
+- ✅ `POST /api/generate-questions` — Body: `{ topic, subject, count, materials? }`.
+  **Implementiert** in `server/` (Node/Express) und `ai-service.js`.
   `materials` ist optional die per `materials.js`/`store.js` hochgeladenen
-  Unterrichtsmaterialien zum Fach. Ob PDFs direkt an Mistral durchgereicht
-  werden können, hängt von der noch offenen Server-Software ab (siehe oben)
-  — anders als bei manchen Cloud-APIs ist PDF-Direkteingabe bei
-  selbstgehosteten Modellen nicht garantiert. Bis das geklärt ist, geht die
-  App vom robusteren Fall aus: reine Textmaterialien (.txt/.md) werden als
-  Text mitgeschickt, PDFs vorerst nur mitgeschickt, wenn der Proxy sie
-  serverseitig in Text umwandeln kann (z. B. `pdf-parse` in Node) —
-  clientseitige PDF-Textextraktion ist explizit nicht Ziel, um `materials.js`
-  schlank zu halten. Antwort: Fragenset im
+  Unterrichtsmaterialien zum Fach; PDFs werden nicht an Mistral
+  durchgereicht, sondern serverseitig über `pdf-parse`
+  (`server/lib/materials.js`) in Text umgewandelt, bevor sie in den Prompt
+  wandern — clientseitige PDF-Textextraktion bleibt bewusst außen vor, um
+  `materials.js` schlank zu halten. Antwort: Fragenset im
   [Upload-Format](#format-für-den-fragen-upload-json) (inkl.
-  `correctAnswer`), das `ai-service.js` wie ein manuell hochgeladenes
-  Fragenset über `question-editor.js`/`store.js` speichert
-  (`QuestionSet.origin = "ai"`), nachdem die Lehrkraft es gesichtet hat.
+  `correctAnswer`). `ai-service.js` reicht den Entwurf zum Sichten/Bearbeiten
+  an das manuelle Formular in `question-editor.js` weiter
+  (`QuestionEditor.prefillFromAi`); erst der reguläre "Fragenset speichern"-
+  Klick der Lehrkraft persistiert ihn über `store.js`
+  (`QuestionSet.origin = "ai"`).
 - `POST /api/generate-review-questions` — Body: `{ questions: [{ text,
   options, correctAnswer, wrongAnswerCounts }], materials? }`, eine Frage pro
   Wiederholungs-Kandidat aus F9. Antwort: pro übergebener Frage eine **neue,
@@ -468,11 +464,12 @@ Datenhoheit-Anforderung uneingeschränkt.
 - **Sitzungsende ist ein manueller Schritt** durch die Lehrkraft, keine
   automatische Zeit- oder Stundenerkennung.
 - **KI-Proxy ist eine neue, wenn auch minimale Infrastruktur-Abhängigkeit**:
-  anders als der Rest der App kann F8/F10 nicht rein statisch gehostet
-  werden. Anbieter/Hosting des Modells ist entschieden (selbstgehostetes
-  Mistral unter `mistral.cndrbrbr.de`); offen ist noch, welche
-  Server-Software dahinter läuft und ob dadurch überhaupt noch ein
-  separater Proxy nötig ist (siehe ["KI-Komponente"](#ki-komponente-fragengenerierung--tipps)).
+  anders als der Rest der App kann F8 (und künftig F9/F10) nicht rein
+  statisch gehostet werden. Für F8 ist der Proxy (`server/`) gebaut und
+  läuft gegen das selbstgehostete, OpenAI-kompatible Mistral unter
+  `mistral.cndrbrbr.de`; wer ihn im laufenden Betrieb hostet/betreibt
+  (eigener Server neben Mistral, o.ä.), ist weiterhin eine offene
+  organisatorische Frage, siehe ["KI-Komponente"](#ki-komponente-fragengenerierung--tipps).
 - **Clipboard-API-Unterstützung für den OneNote-Export ist browserabhängig**
   (z. B. Einschränkungen in älteren mobilen Browsern) — der CSV/JSON-
   Download in F6 ist deshalb kein reines Backup, sondern ein notwendiger
@@ -499,12 +496,9 @@ Datenhoheit-Anforderung uneingeschränkt.
    wortgleiche Kopie (Platzhalter, klar als solcher markiert), bis Schritt 9
    steht. `materials.js`: Upload/Verwaltung von Unterrichtsmaterialien pro
    Fach (IndexedDB, noch ohne KI-Anbindung).
-8. ⬜ KI-Proxy (minimaler Server) + `ai-service.js`: `/api/generate-questions`
-   (F8, inkl. Materialien als Kontext). Anbieter/Hosting ist entschieden
-   (selbstgehostetes Mistral unter `mistral.cndrbrbr.de`, siehe
-   ["KI-Komponente"](#ki-komponente-fragengenerierung--tipps)); noch offen
-   ist die genaue Server-Software dahinter (Ollama/vLLM/o.ä.), die das
-   Request/Response-Format des Proxys bestimmt.
+8. ✅ KI-Proxy (minimaler Server) + `ai-service.js`: `/api/generate-questions`
+   (F8, inkl. Materialien als Kontext) implementiert, siehe `server/` und
+   ["KI-Komponente"](#ki-komponente-fragengenerierung--tipps).
 9. ⬜ `/api/generate-review-questions` (F9): `review.js`/`ai-service.js`
    ersetzen die Platzhalter-Kopie aus Schritt 7 durch echte, neu formulierte
    Fragen zur jeweiligen Fehlvorstellung.

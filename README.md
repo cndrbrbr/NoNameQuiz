@@ -8,10 +8,12 @@ a question is just a matter of rotating your card.
 
 Built on top of [js-aruco2](https://damianofalcioni.github.io/js-aruco2/) for marker
 detection. Questions, sessions, and results are stored locally in the browser via
-IndexedDB. Everything runs client-side; there is no backend or build step (see
+IndexedDB — the app itself is client-only with no backend or build step (see
 [features.md](features.md) and [architecture.md](architecture.md) for the full
-feature/architecture rationale — a couple of optional AI features described there
-aren't built yet, see the note at the end of this file).
+feature/architecture rationale). The one exception is optional AI-generated
+question sets (F8), which use a small stateless [proxy server](server/); a
+couple of other AI features described in those docs aren't built yet, see the
+note further down.
 
 ![NoNameQuiz](NoNameQuiz.jpg)
 
@@ -78,6 +80,11 @@ immediately, same as before.
   correct), then **"Fragenset speichern"**.
 - Existing question sets are listed below the form and can be reused across
   sessions/classes.
+- **Or generate with AI**: enter a topic, subject, and how many questions,
+  click **"Fragen generieren"**. The proposal fills the manual-entry form
+  above (subject's uploaded materials are sent along as context) — review,
+  edit, or delete any question, then save it like any other set. Needs the
+  [AI proxy](server/) running and reachable; see below.
 
 ### 2. Scan — run a live round
 
@@ -132,14 +139,23 @@ you want the room-facing content even bigger regardless of orientation. See
 [architecture.md](architecture.md#präsentationsmodus-smartboard) for why this
 doesn't need a second device/app.
 
+### AI question generation (F8)
+
+Talks to a small [proxy server](server/) rather than an AI API directly from
+the browser, so no key/token ever needs to live in this static page's
+client-side JS. See [server/README.md](server/README.md) to run it locally
+or deploy it; it forwards to a self-hosted, OpenAI-compatible Mistral
+endpoint and stores nothing itself. Once it's running, point
+`proxyBaseUrl` at the top of [ai-service.js](ai-service.js) at it if it's
+not on the same origin as this page.
+
 ### Not implemented yet
 
-Two features from [features.md](features.md) need an external AI API key and a
-small server-side proxy to call it safely (an API key can't live in this
-static page's client-side JS) and aren't wired up yet: **F8** (AI-generated
-question sets from a topic) and **F10** (AI tips for the teacher based on
-error patterns). See [architecture.md](architecture.md#ki-komponente-fragengenerierung--tipps)
-for the planned shape once a provider/hosting choice is made.
+**F9**'s AI-rewritten review questions and **F10** (AI tips for the
+teacher) reuse the same proxy but aren't wired up yet — see
+[architecture.md](architecture.md#ki-komponente-fragengenerierung--tipps)
+for the planned shape. Until then, F9's review-set suggestion re-offers the
+original questions unchanged, clearly marked as a placeholder.
 
 ## Project structure
 
@@ -147,7 +163,9 @@ for the planned shape once a provider/hosting choice is made.
 index.html         — app shell, tabs, camera loop, marker → answer logic
 store.js            — IndexedDB data layer (subjects, classes, question sets,
                        questions, sessions, answer records)
-question-editor.js  — question set upload (JSON) and manual builder
+question-editor.js  — question set upload (JSON), manual builder, and AI-draft review/edit
+materials.js        — per-subject teaching material upload (context for AI generation)
+ai-service.js       — talks to the AI proxy (server/) to generate a question set (F8)
 quiz-runner.js      — session/question flow, ties scanning to the active question
 stats-view.js       — results browser (filter, per-question breakdown)
 export.js           — clipboard HTML-table copy + CSV download
@@ -155,6 +173,7 @@ review.js           — error-rate calculation and review-set generation
 aruco.js            — vendored js-aruco2 marker detector
 cv.js               — vendored computer-vision helpers used by aruco.js
 polyfill.js         — getUserMedia / browser compatibility shims
+server/             — minimal Node/Express AI proxy (F8), see server/README.md
 history/            — archived earlier iterations of index.html, kept for reference
 ```
 

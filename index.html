@@ -12,6 +12,7 @@
   <script src="review.js"></script>
   <script src="question-editor.js"></script>
   <script src="materials.js"></script>
+  <script src="ai-service.js"></script>
   <script src="quiz-runner.js"></script>
   <script src="stats-view.js"></script>
 
@@ -517,15 +518,30 @@
       <button type="button" onclick="QuestionEditor.saveManualQuestionSet()">Fragenset speichern</button>
       <div id="qsMessage"></div>
 
+      <h3>KI-Fragengenerierung (F8)</h3>
+      <p style="font-size:13px;">
+        Schickt Themenbereich, Fach und die für dieses Fach hochgeladenen
+        Materialien (siehe unten) an den
+        <a href="architecture.md#ki-komponente-fragengenerierung--tipps">KI-Proxy</a>.
+        Der Vorschlag füllt das Formular oben – dort sichten, bearbeiten und
+        erst mit "Fragenset speichern" übernehmen.
+      </p>
+      <input type="text" id="aiTopic" placeholder="Themenbereich (z.B. Bruchrechnung, Klasse 7)" style="width:95%;">
+      <div style="margin-top:4px;">
+        <input type="text" id="aiSubject" list="subjectsDatalist" placeholder="Fach" style="width:60%;">
+        <input type="number" id="aiCount" min="1" max="20" value="5" style="width:30%;">
+      </div>
+      <button type="button" onclick="AiService.generate()">Fragen generieren</button>
+      <div id="aiMessage"></div>
+
       <h3>Vorhandene Fragensets</h3>
       <div id="qsList"></div>
 
       <h3>Materialien</h3>
       <p style="font-size:13px;">
         Unterrichtsmaterialien (Skript, Arbeitsblatt, Folien als .txt/.md/.pdf)
-        pro Fach ablegen. Wird lokal gespeichert und dient künftig als
-        Kontext für die KI-Fragengenerierung – die KI-Anbindung selbst ist
-        noch nicht gebaut, siehe
+        pro Fach ablegen. Wird lokal gespeichert und automatisch als Kontext
+        an die KI-Fragengenerierung oben mitgeschickt, siehe
         <a href="architecture.md#ki-komponente-fragengenerierung--tipps">architecture.md</a>.
       </p>
       <input type="text" id="matSubjectInput" list="subjectsDatalist" placeholder="Fach"
