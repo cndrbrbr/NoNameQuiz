@@ -469,8 +469,10 @@ Datenhoheit-Anforderung uneingeschränkt.
   automatische Zeit- oder Stundenerkennung.
 - **KI-Proxy ist eine neue, wenn auch minimale Infrastruktur-Abhängigkeit**:
   anders als der Rest der App kann F8/F10 nicht rein statisch gehostet
-  werden. Hosting/Betrieb des Proxys (wer zahlt die KI-API-Kosten, welcher
-  Anbieter) ist eine offene organisatorische Frage, keine rein technische.
+  werden. Anbieter/Hosting des Modells ist entschieden (selbstgehostetes
+  Mistral unter `mistral.cndrbrbr.de`); offen ist noch, welche
+  Server-Software dahinter läuft und ob dadurch überhaupt noch ein
+  separater Proxy nötig ist (siehe ["KI-Komponente"](#ki-komponente-fragengenerierung--tipps)).
 - **Clipboard-API-Unterstützung für den OneNote-Export ist browserabhängig**
   (z. B. Einschränkungen in älteren mobilen Browsern) — der CSV/JSON-
   Download in F6 ist deshalb kein reines Backup, sondern ein notwendiger
@@ -498,8 +500,11 @@ Datenhoheit-Anforderung uneingeschränkt.
    steht. `materials.js`: Upload/Verwaltung von Unterrichtsmaterialien pro
    Fach (IndexedDB, noch ohne KI-Anbindung).
 8. ⬜ KI-Proxy (minimaler Server) + `ai-service.js`: `/api/generate-questions`
-   (F8, inkl. Materialien als Kontext). **Blockiert auf Anbieter-/Hosting-
-   Entscheidung**, siehe "Offene Punkte".
+   (F8, inkl. Materialien als Kontext). Anbieter/Hosting ist entschieden
+   (selbstgehostetes Mistral unter `mistral.cndrbrbr.de`, siehe
+   ["KI-Komponente"](#ki-komponente-fragengenerierung--tipps)); noch offen
+   ist die genaue Server-Software dahinter (Ollama/vLLM/o.ä.), die das
+   Request/Response-Format des Proxys bestimmt.
 9. ⬜ `/api/generate-review-questions` (F9): `review.js`/`ai-service.js`
    ersetzen die Platzhalter-Kopie aus Schritt 7 durch echte, neu formulierte
    Fragen zur jeweiligen Fehlvorstellung.
