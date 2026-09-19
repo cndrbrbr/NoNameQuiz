@@ -10,6 +10,18 @@ for the full rationale. `/api/generate-review-questions` (F9) and
 It stores nothing — every request is answered directly from the model's
 response. The only persistence in the app remains IndexedDB in the browser.
 
+## Setting up Mistral itself (Debian, CPU-only)
+
+If you don't have an OpenAI-compatible Mistral endpoint yet: `./setup-ollama.sh`
+installs [Ollama](https://ollama.com) and pulls the `mistral` model (7B,
+~4.1GB quantized — fits comfortably in 16GB RAM with no GPU). It binds to
+`127.0.0.1:11434` only; nothing is exposed to the network by this script.
+Run it on the same machine the proxy below will run on:
+
+```bash
+./setup-ollama.sh
+```
+
 ## Setup
 
 ```bash
