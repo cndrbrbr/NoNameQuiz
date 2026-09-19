@@ -62,7 +62,9 @@ format](../architecture.md#format-für-den-fragen-upload-json):
 ```
 
 On failure (model unreachable, or its response isn't valid JSON matching the
-expected shape), responds `502` with `{ "error": "..." }`.
+expected shape), responds `502` with `{ "error": "..." }`. Every request also
+requires the access token if one is configured (see below); missing/wrong
+token responds `401`.
 
 ## Configuration (`.env`)
 
@@ -72,14 +74,26 @@ expected shape), responds `502` with `{ "error": "..." }`.
 | `MISTRAL_BASE_URL` | `https://mistral.cndrbrbr.de/v1` | Base URL of the OpenAI-compatible endpoint |
 | `MISTRAL_MODEL` | `mistral` | Model name passed to `/chat/completions` |
 | `ALLOWED_ORIGIN` | `*` | CORS origin allowed to call this proxy from the browser |
+| `PROXY_ACCESS_TOKEN` | *(unset)* | Shared secret required as `Authorization: Bearer <token>`. Unset = no access control, fine for local testing only |
 
-No auth is configured — `mistral.cndrbrbr.de` doesn't require any today. If
-that changes, add the header in `lib/mistralClient.js` (a comment marks
-where).
+No auth against Mistral itself is configured — `mistral.cndrbrbr.de` doesn't
+require any today. If that changes, add the header in
+`lib/mistralClient.js` (a comment marks where). This is separate from
+`PROXY_ACCESS_TOKEN`, which gates access to *this* proxy, not to Mistral.
 
 ## Deploying alongside the app
 
 The app (`../index.html` etc.) is static and can be hosted anywhere; it
-calls this proxy over HTTP, so point `AiService`'s `PROXY_BASE_URL` (top of
-`../ai-service.js`) at wherever this server ends up running, and set
-`ALLOWED_ORIGIN` here to match the app's origin.
+calls this proxy over HTTP, so point `AiService`'s `proxyBaseUrl` (top of
+`../ai-service.js`, or `AiService.setProxyBaseUrl(...)` at runtime) at
+wherever this server ends up running, and set `ALLOWED_ORIGIN` here to match
+the app's origin.
+
+If the proxy is reachable from the internet (not just from a proxy running
+on the same box as the app's server), set `PROXY_ACCESS_TOKEN` here — e.g.
+`openssl rand -hex 32` — and set the same value via
+`AiService.setAccessToken(...)` (or the `accessToken` var at the top of
+`../ai-service.js`) on the client. Since the app is a static page with no
+login (see features.md), this token is visible to anyone who opens
+DevTools — it stops opportunistic scanning/abuse, not a determined
+attacker with access to the page.

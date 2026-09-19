@@ -4,8 +4,12 @@
 var AiService = (function () {
   // Proxy läuft standardmäßig auf demselben Origin wie diese Seite (relative
   // URL). Läuft der Proxy separat (siehe server/README.md), hier die volle
-  // URL eintragen, z.B. "https://ki-proxy.example.org".
+  // URL eintragen, z.B. "https://mistral.cndrbrbr.de".
   var proxyBaseUrl = "";
+
+  // Nur nötig, wenn der Proxy PROXY_ACCESS_TOKEN gesetzt hat (siehe
+  // server/.env.example) – z.B. weil er öffentlich erreichbar ist.
+  var accessToken = "";
 
   function setMessage(text, isError) {
     var el = document.getElementById("aiMessage");
@@ -41,9 +45,12 @@ var AiService = (function () {
   }
 
   function requestGenerateQuestions(payload) {
+    var headers = { "Content-Type": "application/json" };
+    if (accessToken) headers.Authorization = "Bearer " + accessToken;
+
     return fetch(proxyBaseUrl + "/api/generate-questions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: headers,
       body: JSON.stringify(payload),
     }).then(function (response) {
       if (!response.ok) {
@@ -103,6 +110,9 @@ var AiService = (function () {
     generate: generate,
     setProxyBaseUrl: function (url) {
       proxyBaseUrl = url;
+    },
+    setAccessToken: function (token) {
+      accessToken = token;
     },
   };
 })();
