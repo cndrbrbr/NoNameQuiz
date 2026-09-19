@@ -13,6 +13,8 @@ IndexedDB. Everything runs client-side; there is no backend or build step (see
 feature/architecture rationale — a couple of optional AI features described there
 aren't built yet, see the note at the end of this file).
 
+![NoNameQuiz](NoNameQuiz.png)
+
 ## Requirements
 
 - A device with a camera (phone, tablet, or laptop) and a modern browser
