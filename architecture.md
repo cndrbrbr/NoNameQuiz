@@ -37,6 +37,17 @@ Ein optionaler Server-Sync (mehrere Geräte, zentrale Auswertung für mehrere
 Lehrkräfte) wird unten als **Phase 2** skizziert, aber bewusst nicht jetzt
 gebaut.
 
+**Datenhoheit (neue Anforderung in `features.md`):** Unterrichtsmaterialien,
+Fragensets und alle Antworten/Statistiken müssen ausschließlich lokal auf
+dem Gerät der Lehrkraft bleiben und dürfen es nur über einen aktiven Export
+(F6) verlassen. Das einzige serverseitige Bauteil, das die App im regulären
+Betrieb vorsieht, ist die KI-Anbindung (F8–F10) — und auch die speichert
+selbst nichts dauerhaft (siehe [KI-Komponente](#ki-komponente-fragengenerierung--tipps)).
+Diese Anforderung ist der Grund, warum IndexedDB statt eines Backends die
+alleinige Persistenz bleibt, und warum Phase 2 (Server-Sync) unten
+ausdrücklich als optionale, separat zu aktivierende Erweiterung markiert
+ist statt als stille Weiterentwicklung von Phase 1.
+
 **Ausnahme:** Für die KI-gestützte Fragengenerierung und die KI-Tipps
 (F8/F10 in `features.md`) wird ein winziger, zustandsloser Server-Proxy
 benötigt (siehe Abschnitt ["KI-Komponente"](#ki-komponente-fragengenerierung--tipps)
@@ -438,6 +449,14 @@ UI-Umbau möglich ist, bleibt `store.js` als klar abgegrenzte,
 Promise-basierte Schnittstelle geschrieben — eine spätere Sync-Schicht kann
 sie ersetzen oder umschließen, ohne dass `quiz-runner.js`, `question-editor.js`
 oder `stats-view.js` angepasst werden müssen.
+
+**Verhältnis zur Datenhoheit-Anforderung:** Phase 2 würde die
+Datenlokalität aus `features.md` (siehe oben) bewusst aufheben — Daten
+verließen dann standardmäßig das Gerät. Das ist deshalb keine automatische
+Weiterentwicklung von Phase 1, sondern eine explizite, von der Lehrkraft/
+Schule bewusst zu aktivierende Erweiterung (z. B. Opt-in pro Sitzung oder
+Institution), kein Default. Solange Phase 2 nicht gebaut ist, gilt die
+Datenhoheit-Anforderung uneingeschränkt.
 
 ## Offene Punkte / Risiken
 
