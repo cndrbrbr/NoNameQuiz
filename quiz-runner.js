@@ -15,6 +15,14 @@ var QuizRunner = (function () {
     el.style.color = isError ? "crimson" : "inherit";
   }
 
+  function escapeHtml(str) {
+    return String(str == null ? "" : str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
   function populateSelectors() {
     Promise.all([Store.listSubjects(), Store.listClassGroups()]).then(
       function (results) {
@@ -30,7 +38,7 @@ var QuizRunner = (function () {
         '<option value="">– Fragenset wählen –</option>' +
         sets
           .map(function (s) {
-            return '<option value="' + s.id + '">' + s.title + "</option>";
+            return '<option value="' + s.id + '">' + escapeHtml(s.title) + "</option>";
           })
           .join("");
       if (previousValue) select.value = previousValue;
@@ -57,6 +65,9 @@ var QuizRunner = (function () {
     document.getElementById("scanSetupPanel").style.display = active ? "none" : "block";
     document.getElementById("scanSessionPanel").style.display = active ? "block" : "none";
     document.getElementById("questionDisplayPanel").style.display = active ? "block" : "none";
+    var liveArea = document.getElementById("liveArea");
+    if (liveArea) liveArea.hidden = !active;
+    document.body.classList.toggle("quiz-active", active);
   }
 
   function getCurrentQuestion() {
@@ -79,16 +90,14 @@ var QuizRunner = (function () {
     }
 
     textEl.textContent = question.text;
-    optionsEl.innerHTML =
-      "<div>A: " +
-      question.optionA +
-      "</div><div>B: " +
-      question.optionB +
-      "</div><div>C: " +
-      question.optionC +
-      "</div><div>D: " +
-      question.optionD +
-      "</div>";
+    optionsEl.innerHTML = ["A", "B", "C", "D"]
+      .map(function (letter) {
+        return (
+          '<div class="opt"><span class="letter letter-' + letter + '">' + letter +
+          "</span><span>" + escapeHtml(question["option" + letter]) + "</span></div>"
+        );
+      })
+      .join("");
     progressEl.textContent =
       "Frage " + (currentQuestionIndex + 1) + " von " + currentQuestions.length;
   }
@@ -178,7 +187,7 @@ var QuizRunner = (function () {
         showSessionUi(false);
         renderCurrentQuestion();
         setMessage(
-          "Sitzung beendet. Ergebnisse stehen im Tab „Statistik“.",
+          "Quiz beendet. Die Ergebnisse stehen unter „Auswertung“.",
           false
         );
       }

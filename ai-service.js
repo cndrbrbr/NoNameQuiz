@@ -79,7 +79,27 @@ var AiService = (function () {
       return;
     }
 
-    setMessage("Frage KI an …", false);
+    // Auf reiner CPU dauert eine Antwort 1–2 Minuten. Button sperren, damit
+    // nicht mehrere Anfragen parallel in der Warteschlange landen, und die
+    // Wartezeit anzeigen, damit niemand die Seite vorzeitig verlässt.
+    var button = document.getElementById("aiGenerateBtn");
+    var startedAt = Date.now();
+    function showProgress() {
+      var seconds = Math.round((Date.now() - startedAt) / 1000);
+      var el = document.getElementById("aiMessage");
+      if (!el) return;
+      el.style.color = "inherit";
+      el.innerHTML =
+        '<span class="spinner"></span>Die KI schreibt Fragen … ' +
+        Math.floor(seconds / 60) + ":" + ("0" + (seconds % 60)).slice(-2);
+    }
+    if (button) button.disabled = true;
+    showProgress();
+    var timer = setInterval(showProgress, 1000);
+    function done() {
+      clearInterval(timer);
+      if (button) button.disabled = false;
+    }
 
     Store.findOrCreateSubject(subjectName)
       .then(function (subject) {
@@ -94,15 +114,21 @@ var AiService = (function () {
         });
       })
       .then(function (questionSet) {
+        done();
         setMessage(
           questionSet.questions.length +
-            " Fragen vorgeschlagen – im Formular oben sichten, bearbeiten und dann speichern.",
+            " Fragen vorgeschlagen – bitte unten prüfen und speichern.",
           false
         );
         QuestionEditor.prefillFromAi(questionSet);
       })
       .catch(function (err) {
-        setMessage("Fehler: " + err.message, true);
+        done();
+        var text = err.message;
+        if (err instanceof TypeError) {
+          text = "Keine Verbindung zum KI-Server. Bitte Internetverbindung prüfen und es noch einmal versuchen.";
+        }
+        setMessage("Fehler: " + text, true);
       });
   }
 

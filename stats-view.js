@@ -49,31 +49,37 @@ var StatsView = (function () {
 
       var list = document.getElementById("statsSessionList");
       if (sessions.length === 0) {
-        list.innerHTML = "<p>Keine Sitzungen gefunden.</p>";
+        list.innerHTML =
+          '<p class="empty">Noch keine Quiz-Ergebnisse. Sie erscheinen hier, sobald ein Quiz gespielt wurde.</p>';
         return;
       }
 
+      sessions.sort(function (a, b) {
+        return new Date(b.date) - new Date(a.date);
+      });
+
       list.innerHTML = sessions
         .map(function (s) {
-          var dateLabel = new Date(s.date).toLocaleString();
+          var dateLabel = new Date(s.date).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
           var subjectName = (subjectById[s.subjectId] || {}).name || "?";
           var className = (classById[s.classId] || {}).name || "?";
           var setTitle = (setById[s.questionSetId] || {}).title || "?";
           return (
-            '<div style="border-bottom:1px solid #ddd;padding:4px 0;cursor:pointer;" ' +
-            'onclick="StatsView.selectSession(\'' +
+            '<div class="list-item clickable' +
+            (s.id === currentSessionId ? " selected" : "") +
+            '" onclick="StatsView.selectSession(\'' +
             s.id +
-            "')\">" +
+            "')\"><div class=\"grow\"><strong>" +
+            escapeHtml(setTitle) +
+            "</strong>" +
+            (s.status === "completed" ? "" : '<span class="badge">nicht beendet</span>') +
+            '<div class="sub">' +
+            escapeHtml(subjectName) +
+            " · Klasse " +
+            escapeHtml(className) +
+            " · " +
             dateLabel +
-            " – " +
-            subjectName +
-            " / " +
-            className +
-            " – " +
-            setTitle +
-            " (" +
-            (s.status === "completed" ? "abgeschlossen" : "läuft") +
-            ")</div>"
+            "</div></div><span aria-hidden=\"true\">›</span></div>"
           );
         })
         .join("");
@@ -90,6 +96,9 @@ var StatsView = (function () {
 
   function selectSession(sessionId) {
     currentSessionId = sessionId;
+    document.getElementById("statsReviewCandidates").innerHTML = "";
+    document.getElementById("statsExportMessage").textContent = "";
+    loadSessions();
 
     Promise.all([
       Store.getSession(sessionId),
@@ -141,8 +150,8 @@ var StatsView = (function () {
           "<td>" +
           (i + 1) +
           "</td><td>" +
-          q.text +
-          "</td><td>" +
+          escapeHtml(q.text) +
+          '</td><td class="num">' +
           row.counts.A +
           "</td><td>" +
           row.counts.B +
@@ -161,13 +170,19 @@ var StatsView = (function () {
       .join("");
 
     container.innerHTML =
-      "<h4>" +
-      currentSessionDetail.questionSet.title +
-      "</h4>" +
-      '<table border="1" cellpadding="4" style="border-collapse:collapse;">' +
-      "<tr><th>#</th><th>Frage</th><th>A</th><th>B</th><th>C</th><th>D</th><th>Richtig</th></tr>" +
+      "<h3>" +
+      escapeHtml(currentSessionDetail.questionSet.title) +
+      "</h3>" +
+      '<div class="table-wrap"><table class="stats-table">' +
+      '<tr><th>#</th><th>Frage</th><th class="num">A</th><th class="num">B</th><th class="num">C</th><th class="num">D</th><th class="num">Richtig</th></tr>' +
       rowsHtml +
-      "</table>";
+      "</table></div>";
+
+    var card = document.getElementById("statsDetailCard");
+    if (card) {
+      card.hidden = false;
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   function buildHtmlTable() {
