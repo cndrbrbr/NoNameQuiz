@@ -78,6 +78,11 @@ werden je Fach und Klasse dauerhaft als Statistik gespeichert.
 - Export der gespeicherten Statistik als JSON/CSV, damit die Daten nicht
   ausschließlich im Browser-Speicher eines einzelnen Geräts liegen und bei
   Bedarf gesichert oder in Excel/Sheets weiterverarbeitet werden können.
+- **Komplette Sicherung**: Alle Daten (Fragensets, Materialien, Sitzungen,
+  Antworten) lassen sich als eine JSON-Datei herunterladen und – auch auf
+  einem anderen Gerät – wieder einspielen. Einspielen ergänzt nur (gleiche
+  Datensätze werden überschrieben, nichts gelöscht); gleichnamige Fächer
+  und Klassen werden zusammengeführt.
 - **Für OneNote**: Ergebnisse lassen sich per Klick als formatierte Tabelle
   in die Zwischenablage kopieren und direkt in eine OneNote-Seite einfügen
   (Strg+V erzeugt dort eine native Tabelle) — ohne Umweg über eine separate

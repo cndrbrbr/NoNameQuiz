@@ -317,6 +317,53 @@ var Store = (function () {
     return remove("materials", materialId);
   }
 
+  // --- Sicherung (alle Daten) -----------------------------------------
+
+  var ALL_STORES = [
+    "subjects",
+    "classGroups",
+    "questionSets",
+    "questions",
+    "sessions",
+    "answerRecords",
+    "materials",
+  ];
+
+  function exportAll() {
+    return Promise.all(ALL_STORES.map(getAll)).then(function (results) {
+      var data = {};
+      ALL_STORES.forEach(function (name, i) {
+        data[name] = results[i];
+      });
+      return data;
+    });
+  }
+
+  // Legt Datensätze an bzw. überschreibt solche mit gleicher id (erneutes
+  // Einspielen derselben Sicherung erzeugt also keine Duplikate). Löscht
+  // nichts. Alles in einer Transaktion: bei einem Fehler wird nichts
+  // übernommen.
+  function importAll(data) {
+    return tx(ALL_STORES, "readwrite").then(function (t) {
+      return new Promise(function (resolve, reject) {
+        ALL_STORES.forEach(function (name) {
+          (data[name] || []).forEach(function (record) {
+            t.objectStore(name).put(record);
+          });
+        });
+        t.oncomplete = function () {
+          resolve();
+        };
+        t.onerror = function () {
+          reject(t.error);
+        };
+        t.onabort = function () {
+          reject(t.error || new Error("Import abgebrochen"));
+        };
+      });
+    });
+  }
+
   return {
     newId: newId,
     listSubjects: listSubjects,
@@ -337,5 +384,7 @@ var Store = (function () {
     saveMaterial: saveMaterial,
     listMaterialsForSubject: listMaterialsForSubject,
     deleteMaterial: deleteMaterial,
+    exportAll: exportAll,
+    importAll: importAll,
   };
 })();

@@ -49,6 +49,7 @@ var Exporter = (function () {
   return {
     copyHtmlTable: copyHtmlTable,
     downloadCsv: downloadCsv,
+    downloadFile: downloadFile,
     csvEscape: csvEscape,
   };
 })();

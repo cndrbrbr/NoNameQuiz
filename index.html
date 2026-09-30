@@ -11,6 +11,7 @@
   <script src="aruco.js"></script>
   <script src="store.js"></script>
   <script src="export.js"></script>
+  <script src="backup.js"></script>
   <script src="review.js"></script>
   <script src="question-editor.js"></script>
   <script src="materials.js"></script>
@@ -999,10 +1000,31 @@
         </div>
       </div>
 
-      <p class="hint" style="margin-top:18px;">
-        Fragen, Materialien und Ergebnisse werden nur in diesem Browser auf diesem
-        Gerät gespeichert. Nur für den KI-Vorschlag werden Thema und Material kurz an
-        den KI-Server geschickt (dort wird nichts gespeichert).
+      <div class="card" style="margin-top:22px;">
+        <h3>Daten sichern</h3>
+        <p class="hint">
+          Fragen, Materialien und Ergebnisse werden nur in diesem Browser auf diesem
+          Gerät gespeichert. Werden die Browserdaten gelöscht, sind sie weg. Lade
+          deshalb ab und zu eine Sicherung herunter. Damit kannst du die Daten auch
+          auf ein anderes Gerät übertragen.
+        </p>
+        <div class="btn-row">
+          <button type="button" class="btn" onclick="Backup.exportAll()">Sicherung herunterladen</button>
+          <label class="btn">Sicherung einspielen
+            <input type="file" accept=".json,application/json" hidden
+              onchange="Backup.importFile(this.files[0]); this.value = '';">
+          </label>
+        </div>
+        <div id="backupMessage" class="msg"></div>
+        <p class="hint">
+          Beim Einspielen wird nichts gelöscht: Vorhandenes bleibt, Neues kommt dazu,
+          doppelt Vorhandenes wird nicht doppelt angelegt.
+        </p>
+      </div>
+
+      <p class="hint">
+        Nur für den KI-Vorschlag werden Thema und Material kurz an den KI-Server
+        geschickt. Dort wird nichts gespeichert.
       </p>
     </section>
 
