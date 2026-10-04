@@ -102,6 +102,7 @@ werden je Fach und Klasse dauerhaft als Statistik gespeichert.
   F1) — die KI ersetzt also die manuelle Eingabe, nicht die Kontrolle durch
   die Lehrkraft.
 - Dieselbe Anbindung wird für die Wiederholungsfragen aus F9 genutzt.
+- to Do : mit OpenAI Relation Flow ein eigenes GPT ABO mit der App verwenden
 
 ### F9 – Wiederholung falsch beantworteter Fragen
 
