@@ -3,6 +3,7 @@
 var StatsView = (function () {
   var currentSessionId = null;
   var currentSessionDetail = null; // { session, questionSet, rows: [{question, counts, correctCount, total}] }
+  var listedSessionIds = [];
 
   function populateFilters() {
     Promise.all([Store.listSubjects(), Store.listClassGroups()]).then(
@@ -40,7 +41,7 @@ var StatsView = (function () {
       }),
       Store.listSubjects(),
       Store.listClassGroups(),
-      Store.listQuestionSets(),
+      Store.listQuestionSets({ includeDeleted: true }),
     ]).then(function (results) {
       var sessions = results[0];
       var subjectById = indexBy(results[1]);
@@ -48,32 +49,43 @@ var StatsView = (function () {
       var setById = indexBy(results[3]);
 
       var list = document.getElementById("statsSessionList");
+      listedSessionIds = sessions.map(function (s) {
+        return s.id;
+      });
+      var allButton = document.getElementById("statsExportAllBtn");
+      if (allButton) allButton.hidden = sessions.length === 0;
       if (sessions.length === 0) {
-        list.innerHTML = "<p>Keine Sitzungen gefunden.</p>";
+        list.innerHTML =
+          '<p class="empty">Noch keine Quiz-Ergebnisse. Sie erscheinen hier, sobald ein Quiz gespielt wurde.</p>';
         return;
       }
 
+      sessions.sort(function (a, b) {
+        return new Date(b.date) - new Date(a.date);
+      });
+
       list.innerHTML = sessions
         .map(function (s) {
-          var dateLabel = new Date(s.date).toLocaleString();
+          var dateLabel = new Date(s.date).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
           var subjectName = (subjectById[s.subjectId] || {}).name || "?";
           var className = (classById[s.classId] || {}).name || "?";
           var setTitle = (setById[s.questionSetId] || {}).title || "?";
           return (
-            '<div style="border-bottom:1px solid #ddd;padding:4px 0;cursor:pointer;" ' +
-            'onclick="StatsView.selectSession(\'' +
+            '<div class="list-item clickable' +
+            (s.id === currentSessionId ? " selected" : "") +
+            '" onclick="StatsView.selectSession(\'' +
             s.id +
-            "')\">" +
+            "')\"><div class=\"grow\"><strong>" +
+            escapeHtml(setTitle) +
+            "</strong>" +
+            (s.status === "completed" ? "" : '<span class="badge">nicht beendet</span>') +
+            '<div class="sub">' +
+            escapeHtml(subjectName) +
+            " · Klasse " +
+            escapeHtml(className) +
+            " · " +
             dateLabel +
-            " – " +
-            subjectName +
-            " / " +
-            className +
-            " – " +
-            setTitle +
-            " (" +
-            (s.status === "completed" ? "abgeschlossen" : "läuft") +
-            ")</div>"
+            "</div></div><span aria-hidden=\"true\">›</span></div>"
           );
         })
         .join("");
@@ -90,6 +102,9 @@ var StatsView = (function () {
 
   function selectSession(sessionId) {
     currentSessionId = sessionId;
+    document.getElementById("statsReviewCandidates").innerHTML = "";
+    document.getElementById("statsExportMessage").textContent = "";
+    loadSessions();
 
     Promise.all([
       Store.getSession(sessionId),
@@ -141,8 +156,8 @@ var StatsView = (function () {
           "<td>" +
           (i + 1) +
           "</td><td>" +
-          q.text +
-          "</td><td>" +
+          escapeHtml(q.text) +
+          '</td><td class="num">' +
           row.counts.A +
           "</td><td>" +
           row.counts.B +
@@ -161,13 +176,19 @@ var StatsView = (function () {
       .join("");
 
     container.innerHTML =
-      "<h4>" +
-      currentSessionDetail.questionSet.title +
-      "</h4>" +
-      '<table border="1" cellpadding="4" style="border-collapse:collapse;">' +
-      "<tr><th>#</th><th>Frage</th><th>A</th><th>B</th><th>C</th><th>D</th><th>Richtig</th></tr>" +
+      "<h3>" +
+      escapeHtml(currentSessionDetail.questionSet.title) +
+      "</h3>" +
+      '<div class="table-wrap"><table class="stats-table">' +
+      '<tr><th>#</th><th>Frage</th><th class="num">A</th><th class="num">B</th><th class="num">C</th><th class="num">D</th><th class="num">Richtig</th></tr>' +
       rowsHtml +
-      "</table>";
+      "</table></div>";
+
+    var card = document.getElementById("statsDetailCard");
+    if (card) {
+      card.hidden = false;
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   function buildHtmlTable() {
@@ -263,6 +284,27 @@ var StatsView = (function () {
     );
   }
 
+  function exportExcel() {
+    if (!currentSessionId) return;
+    ExcelIO.exportSession(currentSessionId).catch(function (err) {
+      setExportMessage(err.message, true);
+    });
+  }
+
+  function exportAllExcel() {
+    var el = document.getElementById("statsListMessage");
+    ExcelIO.exportSessions(listedSessionIds)
+      .then(function () {
+        if (el) el.textContent = "";
+      })
+      .catch(function (err) {
+        if (el) {
+          el.textContent = err.message;
+          el.style.color = "crimson";
+        }
+      });
+  }
+
   function setExportMessage(text, isError) {
     var el = document.getElementById("statsExportMessage");
     if (!el) return;
@@ -325,6 +367,8 @@ var StatsView = (function () {
     selectSession: selectSession,
     exportClipboard: exportClipboard,
     exportCsv: exportCsv,
+    exportExcel: exportExcel,
+    exportAllExcel: exportAllExcel,
     suggestReview: suggestReview,
     createReviewSet: createReviewSet,
   };

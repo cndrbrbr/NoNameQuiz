@@ -1,14 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NoNameQuiz</title>
 
   <script src="polyfill.js"></script>
   <script src="cv.js"></script>
   <script src="aruco.js"></script>
   <script src="store.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
   <script src="export.js"></script>
+  <script src="excel.js"></script>
+  <script src="backup.js"></script>
   <script src="review.js"></script>
   <script src="question-editor.js"></script>
   <script src="materials.js"></script>
@@ -17,11 +22,181 @@
   <script src="stats-view.js"></script>
 
   <style>
-    body { font-family: monospace; }
-    .tab-button { font-size: 16px; padding: 8px 14px; margin: 2px; }
-    .tab-button.active { font-weight: bold; text-decoration: underline; }
-    table { margin: 8px auto; }
-    #qsQuestionsContainer, #viewFragen, #viewStatistik { text-align: left; max-width: 640px; margin: 0 auto; }
+    :root {
+      --bg: #f4f5f7;
+      --card: #ffffff;
+      --text: #1d2330;
+      --muted: #5f6b7a;
+      --line: #dde1e7;
+      --accent: #2463eb;
+      --accent-text: #ffffff;
+      --accent-soft: #e6eefe;
+      --ok: #1a7f45;
+      --ok-soft: #e3f4ea;
+      --err: #c0262d;
+      --err-soft: #fbe7e8;
+      --warn-soft: #fff5d6;
+      --a: #d9480f;
+      --b: #1c7ed6;
+      --c: #2b8a3e;
+      --d: #9c36b5;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #14171c;
+        --card: #1e232b;
+        --text: #e8ebf0;
+        --muted: #9aa5b4;
+        --line: #333a45;
+        --accent: #5b8def;
+        --accent-text: #0e1320;
+        --accent-soft: #23304a;
+        --ok: #5fd08f;
+        --ok-soft: #1c3528;
+        --err: #ff7b80;
+        --err-soft: #3e2023;
+        --warn-soft: #3a3320;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+      padding-bottom: 80px; /* Platz für die Navigationsleiste unten */
+    }
+    main { max-width: 760px; margin: 0 auto; padding: 12px 16px; }
+    h1, h2, h3 { margin: 0 0 8px; line-height: 1.25; }
+    h2 { font-size: 20px; }
+    h3 { font-size: 17px; }
+    p { margin: 6px 0; }
+    [hidden] { display: none !important; }
+
+    .app-header {
+      background: var(--card);
+      border-bottom: 1px solid var(--line);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .app-header h1 { font-size: 19px; margin: 0; }
+
+    /* Navigation unten – mit dem Daumen gut erreichbar */
+    #tabs {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+      display: flex; background: var(--card); border-top: 1px solid var(--line);
+    }
+    .tab-button {
+      flex: 1; border: 0; background: none; color: var(--muted);
+      padding: 10px 4px 12px; font: inherit; font-size: 14px; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+    }
+    .tab-button .tab-icon { font-size: 22px; line-height: 1; }
+    .tab-button.active { color: var(--accent); font-weight: 600; }
+
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 16px; margin: 0 0 14px;
+    }
+    .hint { color: var(--muted); font-size: 14px; }
+    .section-title { margin: 22px 0 10px; }
+
+    label.field { display: block; margin: 0 0 12px; font-weight: 600; font-size: 14px; }
+    label.field input, label.field select, label.field textarea { margin-top: 4px; font-weight: 400; }
+    input[type=text], input[type=number], select, textarea {
+      width: 100%; font: inherit; color: var(--text); background: var(--card);
+      border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+    }
+    textarea { resize: vertical; }
+    input:focus, select:focus, textarea:focus, button:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: 1px;
+    }
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; min-width: 0; }
+
+    button { font: inherit; cursor: pointer; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      border: 1px solid var(--line); background: var(--card); color: var(--text);
+      border-radius: 8px; padding: 10px 16px; font-weight: 600; min-height: 44px;
+    }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+    .btn.big { width: 100%; font-size: 18px; padding: 14px; }
+    .btn.small { min-height: 34px; padding: 6px 10px; font-size: 14px; }
+    .btn.danger { color: var(--err); }
+    .btn:disabled { opacity: .55; cursor: default; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+    .msg:empty { display: none; }
+    .msg { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); }
+
+    .badge {
+      display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px;
+      border-radius: 99px; background: var(--accent-soft); color: var(--accent); margin-left: 4px;
+    }
+
+    /* Auswahlkacheln "Neues Fragenset" */
+    .choice-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+    .choice {
+      text-align: left; border: 1px solid var(--line); background: var(--card); color: var(--text);
+      border-radius: 12px; padding: 14px;
+    }
+    .choice.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .choice-title { display: block; font-weight: 700; font-size: 16px; }
+    .choice-sub { display: block; color: var(--muted); font-size: 14px; margin-top: 2px; }
+
+    /* Listen */
+    .list-item {
+      display: flex; align-items: center; gap: 10px; padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .list-item:last-child { border-bottom: 0; }
+    .list-item .grow { flex: 1; min-width: 0; }
+    .list-item .sub { color: var(--muted); font-size: 14px; }
+    #qsList .list-item { flex-wrap: wrap; }
+    #qsList .list-item .grow { flex-basis: 180px; }
+    .list-item.clickable { cursor: pointer; }
+    .list-item.selected { background: var(--accent-soft); margin: 0 -16px; padding: 10px 16px; }
+
+    /* Frageneditor */
+    #qsQuestionsContainer { counter-reset: frage; }
+    .qs-question-row {
+      counter-increment: frage; border: 1px solid var(--line); border-radius: 10px;
+      padding: 12px; margin: 10px 0;
+    }
+    .q-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .q-head .q-num::before { content: "Frage " counter(frage); font-weight: 700; }
+    .opt-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .opt-row input[type=radio] { width: 22px; height: 22px; flex: none; accent-color: var(--ok); }
+    .opt-row input[type=text] { padding: 8px 10px; }
+    .opt-row:has(input[type=radio]:checked) input[type=text] { border-color: var(--ok); background: var(--ok-soft); }
+
+    .letter {
+      flex: none; display: inline-flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 6px; color: #fff; font-weight: 700;
+    }
+    .letter-A { background: var(--a); } .letter-B { background: var(--b); }
+    .letter-C { background: var(--c); } .letter-D { background: var(--d); }
+
+    details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+    details { margin: 4px 0 12px; }
+
+    /* Warte-Anzeige KI */
+    .spinner {
+      display: inline-block; width: 16px; height: 16px; border-radius: 50%;
+      border: 2px solid currentColor; border-right-color: transparent;
+      animation: spin .8s linear infinite; vertical-align: -3px; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Schritte-Anleitung */
+    ol.steps { margin: 6px 0 0; padding-left: 22px; }
+    ol.steps li { margin: 3px 0; }
+
+    /* ---------------- Quiz / Scan ---------------- */
 
     /* Video bleibt als Bildquelle für die Canvas aktiv, die Canvas zeigt
        dasselbe Bild bereits inkl. Marker-Overlay – deshalb nur als kleines
@@ -31,52 +206,82 @@
        zuverlässig weiter dekodiert, bis ein App-Fokuswechsel das Rendering
        erzwingt – die Canvas blieb dann leer. Klein, aber normal im
        Layout gerendert, umgeht das. */
-    #video { width: 96px; height: 72px; }
+    #video { width: 96px; height: 72px; border-radius: 6px; }
 
     /* max-height verhindert, dass die Canvas (v.a. bevor ein Kamerabild da
        ist, unsichtbar auf dunklem Hintergrund) im niedrigen Querformat-
        Viewport eines Handys mehr Höhe belegt, als sichtbar ist, und Frage/
        Ergebnisse darunter aus dem sichtbaren Bereich schiebt. */
-    #canvas { width: 100%; max-width: 480px; max-height: 30vh; height: auto; }
+    #canvas { display: block; width: 100%; max-width: 480px; max-height: 30vh; height: auto; margin: 8px auto 0; border-radius: 8px; }
 
-    .scan-camera { max-width: 640px; margin: 0 auto; }
-    .scan-info { max-width: 640px; margin: 0 auto; }
+    .scan-camera { text-align: center; }
+    /* Kamera erst zeigen, wenn ein Quiz läuft – vorher gibt es nichts zu scannen. */
+    body:not(.quiz-active) .scan-camera { display: none; }
+    #cameraStatus { margin-bottom: 8px; }
+
+    #questionProgress { color: var(--muted); font-weight: 600; font-size: 14px; }
+    #questionText { font-weight: 700; font-size: 22px; margin: 4px 0 10px; }
+    #questionOptionsDisplay .opt { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 18px; }
+
+    .live-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .chip {
+      display: inline-block; min-width: 34px; text-align: center; padding: 3px 9px;
+      border-radius: 99px; background: var(--accent-soft); font-weight: 600; font-size: 15px;
+    }
+    .chip.open { background: var(--warn-soft); }
+    .empty { color: var(--muted); font-size: 14px; }
+
+    .bars .bar-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .bars .bar-track { flex: 1; height: 22px; background: var(--bg); border-radius: 6px; overflow: hidden; }
+    .bars .bar-fill { height: 100%; border-radius: 6px; transition: width .2s; }
+    .bars .bar-count { width: 28px; text-align: right; font-weight: 700; }
+    .fill-A { background: var(--a); } .fill-B { background: var(--b); }
+    .fill-C { background: var(--c); } .fill-D { background: var(--d); }
+
+    #attendanceEditor { margin-top: 10px; }
+    #results h3 { margin-top: 14px; }
 
     /* Querformat (Handy gedreht = fürs Smartboard-Mirroring): Kamerabild am
        linken Rand, Frage/Steuerung/Statistik rechts daneben, statt lang
        gestapelt – nutzt die Breite eines 16:9-Screens. */
-    @media (orientation: landscape) {
-      .scan-layout {
-        display: flex;
-        flex-wrap: nowrap;
-        justify-content: flex-start;
-        align-items: flex-start;
-        gap: 16px;
-        text-align: left;
-        width: 100%;
-      }
-      .scan-camera { flex: 0 0 auto; width: 38%; max-width: 320px; margin: 0; }
-      .scan-info { flex: 1 1 auto; min-width: 0; margin: 0; }
+    @media (orientation: landscape) and (min-width: 700px) {
+      body.quiz-active main { max-width: none; }
+      .scan-layout { display: flex; gap: 16px; align-items: flex-start; }
+      .scan-camera { flex: 0 0 auto; width: 38%; max-width: 360px; }
+      .scan-info { flex: 1 1 auto; min-width: 0; }
       #canvas { max-width: 100%; max-height: 60vh; }
       #questionText { font-size: 26px; }
-      #questionOptionsDisplay div { font-size: 18px; }
+      #questionOptionsDisplay .opt { font-size: 20px; }
+      .live-grid { grid-template-columns: 1fr 1fr; }
     }
 
     body.presentation-mode #questionText { font-size: 42px; }
-    body.presentation-mode #questionOptionsDisplay div { font-size: 28px; }
+    body.presentation-mode #questionOptionsDisplay .opt { font-size: 28px; }
+    body.presentation-mode .letter { width: 40px; height: 40px; font-size: 24px; }
     body.presentation-mode #results,
     body.presentation-mode #attendance,
     body.presentation-mode #missing { font-size: 20px; }
+    body.presentation-mode .app-header { padding: 4px 16px; }
+    body.presentation-mode .app-header h1 { font-size: 14px; }
+    body.presentation-mode .app-header .btn { min-height: 0; padding: 3px 8px; font-size: 12px; }
     /* Steuerung nur verkleinern (Schrift/Abstand), nie ausblenden oder per
        Transform/Opacity verstecken – auf Touchscreens gibt es kein :hover,
        um sie wieder "sichtbar" zu machen, das macht Buttons sonst dauerhaft
        kaum antippbar. */
     body.presentation-mode .teacher-controls,
     body.presentation-mode #tabs { font-size: 11px; }
-    body.presentation-mode .teacher-controls button,
+    body.presentation-mode .teacher-controls .btn,
     body.presentation-mode .teacher-controls input,
     body.presentation-mode .teacher-controls select,
-    body.presentation-mode #tabs button { font-size: 11px !important; padding: 3px 6px !important; }
+    body.presentation-mode #tabs button { font-size: 11px !important; padding: 3px 6px !important; min-height: 0; }
+    body.presentation-mode .tab-icon { display: none; }
+
+    /* Statistik */
+    .stats-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .stats-table th, .stats-table td { border-bottom: 1px solid var(--line); padding: 6px 4px; text-align: left; vertical-align: top; }
+    .stats-table td:nth-child(n+3), .stats-table th:nth-child(n+3) { text-align: center; white-space: nowrap; }
+    .table-wrap { overflow-x: auto; }
   </style>
 
   <script>
@@ -85,7 +290,14 @@
     var confirmedCards = {};
     var attendanceLocked = false;
 
-    // --- Tabs / Präsentationsmodus ---------------------------------------
+    // Gegen Fehlerkennungen (Geisterkarten, kurz falsch gelesene Antwort
+    // beim Drehen): Karte + Antwort zählen erst, wenn sie in so vielen
+    // aufeinanderfolgenden Kamerabildern gleich erkannt wurden.
+    var CONFIRM_FRAMES = 3;
+    var frameNumber = 0;
+    var markerStreaks = {}; // id -> { answer, count, frame }
+
+    // --- Navigation / Präsentationsmodus ------------------------------------
 
     function showView(name) {
       document.getElementById("viewFragen").style.display = name === "fragen" ? "block" : "none";
@@ -103,11 +315,95 @@
         StatsView.populateFilters();
         StatsView.loadSessions();
       }
+      window.scrollTo(0, 0);
     }
 
     function togglePresentationMode() {
       document.body.classList.toggle("presentation-mode");
     }
+
+    function escapeHtml(str) {
+      return String(str == null ? "" : str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // --- Fragen-Ansicht: Auswahl "Neues Fragenset" ---------------------------
+
+    function openCreate(kind) {
+      document.getElementById("panelAi").hidden = kind !== "ai";
+      document.getElementById("panelFile").hidden = kind !== "file";
+      document.querySelectorAll(".choice").forEach(function (el) {
+        el.classList.toggle("active", el.dataset.kind === kind);
+      });
+
+      if (kind === "manual") {
+        openEditor("Neues Fragenset", "");
+        if (document.querySelectorAll(".qs-question-row").length === 0) {
+          QuestionEditor.addQuestionRow();
+        }
+      } else {
+        document.getElementById("qsEditorPanel").hidden = true;
+        var panel = document.getElementById(kind === "ai" ? "panelAi" : "panelFile");
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
+    function openEditor(title, hint) {
+      var panel = document.getElementById("qsEditorPanel");
+      document.getElementById("qsEditorTitle").textContent = title;
+      var hintEl = document.getElementById("qsEditorHint");
+      hintEl.textContent = hint;
+      hintEl.hidden = !hint;
+      panel.hidden = false;
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function cancelEditor() {
+      document.getElementById("qsTitle").value = "";
+      document.getElementById("qsSubject").value = "";
+      document.getElementById("qsQuestionsContainer").innerHTML = "";
+      document.getElementById("qsEditorPanel").hidden = true;
+      document.querySelectorAll(".choice").forEach(function (el) {
+        el.classList.remove("active");
+      });
+    }
+
+    // Material gehört immer zum Fach, das oben im KI-Formular steht.
+    function syncMaterialSubject() {
+      document.getElementById("matSubjectInput").value =
+        document.getElementById("aiSubject").value.trim();
+      Materials.renderList();
+    }
+
+    // Aus der Fragenset-Liste direkt ein Quiz vorbereiten.
+    function prepareQuiz(questionSetId, subjectName) {
+      showView("scan");
+      var select = document.getElementById("scanQuestionSetSelect");
+      select.value = questionSetId;
+      document.getElementById("scanSubjectInput").value = subjectName || "";
+      document.getElementById("scanClassInput").focus();
+    }
+
+    // Fach automatisch aus dem gewählten Fragenset übernehmen.
+    function onQuestionSetPicked() {
+      var id = document.getElementById("scanQuestionSetSelect").value;
+      if (!id) return;
+      Promise.all([Store.listQuestionSets(), Store.listSubjects()]).then(function (r) {
+        var set = r[0].filter(function (s) { return s.id === id; })[0];
+        var subject = set && r[1].filter(function (s) { return s.id === set.subjectId; })[0];
+        if (subject) document.getElementById("scanSubjectInput").value = subject.name;
+      });
+    }
+
+    function updateNoSetsHint() {
+      Store.listQuestionSets().then(function (sets) {
+        document.getElementById("noSetsHint").hidden = sets.length > 0;
+      });
+    }
+    document.addEventListener("nnq:questionsets-changed", updateNoSetsHint);
 
     // --- Kamera / ArUco-Erkennung (bestehende Logik) ----------------------
     // Wird bewusst erst per Tap auf einen Button gestartet, nicht
@@ -198,6 +494,7 @@
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             video.play();
+            canvas.style.display = "block";
             setCameraStatus("", false);
             if (startBtn) startBtn.style.display = "none";
             requestAnimationFrame(tick);
@@ -242,6 +539,7 @@
         snapshot();
 
         var markers = detector.detect(imageData);
+        frameNumber++;
         drawCorners(markers);
         drawId(markers);
       }
@@ -281,21 +579,40 @@
     function drawId(markers) {
       var corners, corner, x, y, i, j;
 
-      context.strokeStyle = "blue";
+      var changed = false;
+
       context.lineWidth = 1;
 
       for (i = 0; i !== markers.length; ++i) {
-        if (markers[i].id === 0) {
+        var id = markers[i].id;
+        if (id === 0) {
           continue;
         }
 
-        activeCards[markers[i].id] = true;
+        var answer = getAnswer(markers[i]);
+        var streak = markerStreaks[id];
+        if (streak && streak.frame === frameNumber) {
+          continue; // dieselbe ID zweimal im selben Bild: Fehlerkennung
+        }
+        if (streak && streak.frame === frameNumber - 1 && streak.answer === answer) {
+          streak.count++;
+          streak.frame = frameNumber;
+        } else {
+          streak = markerStreaks[id] = { answer: answer, count: 1, frame: frameNumber };
+        }
+        var confirmed = streak.count >= CONFIRM_FRAMES;
 
-        if (!attendanceLocked || confirmedCards[markers[i].id]) {
-          QuizRunner.recordAnswer(markers[i].id, getAnswer(markers[i]));
+        if (confirmed) {
+          if (!activeCards[id]) changed = true;
+          activeCards[id] = true;
+
+          if (QuizRunner.hasActiveSession() && (!attendanceLocked || confirmedCards[id])) {
+            if (QuizRunner.getResponses()[id] !== answer) changed = true;
+            QuizRunner.recordAnswer(id, answer);
+          }
         }
 
-        updateResults();
+        context.strokeStyle = confirmed ? "blue" : "gray";
 
         corners = markers[i].corners;
 
@@ -309,12 +626,10 @@
           y = Math.min(y, corner.y);
         }
 
-        context.strokeText(
-          markers[i].id + " : " + getAnswer(markers[i]),
-          x,
-          y
-        );
+        context.strokeText(id + " : " + answer, x, y);
       }
+
+      if (changed) updateResults();
     }
 
     function getAnswer(marker) {
@@ -343,77 +658,85 @@
 
     // --- Anwesenheit + Ergebnisanzeige (an QuizRunner gekoppelt) ----------
 
+    function chipsHtml(ids, extraClass, emptyText) {
+      if (ids.length === 0) return '<div class="empty">' + emptyText + "</div>";
+      return (
+        '<div class="chips">' +
+        ids
+          .map(function (id) {
+            return '<span class="chip ' + (extraClass || "") + '">' + escapeHtml(id) + "</span>";
+          })
+          .join("") +
+        "</div>"
+      );
+    }
+
     function updateResults() {
       var responses = QuizRunner.getResponses();
-      var text = "";
-      var attendanceText = "";
-      var missingText = "";
-      var counts = {
-        A: 0,
-        B: 0,
-        C: 0,
-        D: 0
-      };
+      var counts = { A: 0, B: 0, C: 0, D: 0 };
+      var answered = [];
+      var missing = [];
 
       for (var id in responses) {
-        text += id + " = " + responses[id] + "<br>";
+        answered.push(id + ": " + responses[id]);
         counts[responses[id]]++;
       }
 
       var cardsToShow = attendanceLocked ? confirmedCards : activeCards;
+      var present = Object.keys(cardsToShow);
 
-      for (var id in cardsToShow) {
-        attendanceText += id + "<br>";
-
-        if (!(id in responses)) {
-          missingText += id + "<br>";
-        }
-      }
-
-      if (text === "") {
-        text = "Die Runde ist eröffnet";
-      }
-      if (missingText === "") {
-        missingText = "Alle dabei!";
-      }
-      var summaryText =
-        "A: " + counts.A + "<br>" +
-        "B: " + counts.B + "<br>" +
-        "C: " + counts.C + "<br>" +
-        "D: " + counts.D;
+      present.forEach(function (id) {
+        if (!(id in responses)) missing.push(id);
+      });
 
       if (attendanceLocked) {
+        var max = Math.max(1, counts.A, counts.B, counts.C, counts.D);
+        var bars = ["A", "B", "C", "D"]
+          .map(function (letter) {
+            return (
+              '<div class="bar-row">' +
+              '<span class="letter letter-' + letter + '">' + letter + "</span>" +
+              '<div class="bar-track"><div class="bar-fill fill-' + letter +
+              '" style="width:' + Math.round((counts[letter] / max) * 100) + '%"></div></div>' +
+              '<span class="bar-count">' + counts[letter] + "</span>" +
+              "</div>"
+            );
+          })
+          .join("");
+
         document.getElementById("results").innerHTML =
-          "<h3>Ergebnisse</h3>" + text +
-          "<br><br><h3>Verteilung</h3>" +
-          summaryText;
+          "<h3>Antworten</h3>" +
+          '<div class="bars">' + bars + "</div>" +
+          chipsHtml(answered, "", "Noch keine Antworten – Karten hochhalten lassen.");
+        document.getElementById("missing").innerHTML =
+          "<h3>Noch offen (" + missing.length + ")</h3>" +
+          chipsHtml(missing, "open", "Alle haben geantwortet!");
       } else {
         document.getElementById("results").innerHTML = "";
+        document.getElementById("missing").innerHTML = "";
       }
 
       document.getElementById("attendance").innerHTML =
-        "<h3>Wer spielt mit?</h3>" + attendanceText;
-
-      if (attendanceLocked) {
-        document.getElementById("missing").innerHTML =
-          "<h3>Noch offen</h3>" + missingText;
-      } else {
-        document.getElementById("missing").innerHTML = "";
-      }
+        "<h3>Wer spielt mit? (" + present.length + ")</h3>" +
+        chipsHtml(
+          present,
+          "",
+          "Noch keine Karte erkannt. Alle halten ihre Karte in die Kamera."
+        );
     }
 
     function lockAttendance() {
       confirmedCards = { ...activeCards };
       attendanceLocked = true;
       document.getElementById("lockButton").style.display = "none";
-      document.getElementById("editButton").style.display = "inline";
+      document.getElementById("editButton").style.display = "inline-flex";
       document.getElementById("attendanceEditor").style.display = "none";
       updateResults();
     }
 
     function editAttendance() {
       attendanceLocked = false;
-      document.getElementById("lockButton").style.display = "inline";
+      document.getElementById("lockButton").style.display = "inline-flex";
       document.getElementById("editButton").style.display = "none";
       document.getElementById("attendanceEditor").style.display = "block";
       updateResults();
@@ -447,7 +770,7 @@
       activeCards = {};
       confirmedCards = {};
       attendanceLocked = false;
-      document.getElementById("lockButton").style.display = "inline";
+      document.getElementById("lockButton").style.display = "inline-flex";
       document.getElementById("editButton").style.display = "none";
       document.getElementById("attendanceEditor").style.display = "none";
 
@@ -457,7 +780,7 @@
 
     function handleNextQuestion() {
       if (!QuizRunner.hasActiveSession()) {
-        alert("Bitte zuerst eine Sitzung starten.");
+        alert("Bitte zuerst ein Quiz starten.");
         return;
       }
       QuizRunner.nextQuestion();
@@ -465,9 +788,10 @@
     }
 
     function handleEndSession() {
+      if (!confirm("Quiz wirklich beenden? Die bisherigen Antworten bleiben gespeichert.")) return;
       QuizRunner.endSession();
       attendanceLocked = false;
-      document.getElementById("lockButton").style.display = "inline";
+      document.getElementById("lockButton").style.display = "inline-flex";
       document.getElementById("editButton").style.display = "none";
       document.getElementById("attendanceEditor").style.display = "none";
       updateResults();
@@ -476,6 +800,7 @@
     window.onload = function () {
       QuizRunner.populateSelectors();
       QuestionEditor.renderQuestionSetList();
+      updateNoSetsHint();
       showView("scan");
     };
   </script>
@@ -487,175 +812,312 @@
   <datalist id="subjectsDatalist"></datalist>
   <datalist id="classGroupsDatalist"></datalist>
 
-  <center>
+  <header class="app-header">
+    <h1>NoNameQuiz</h1>
+    <button type="button" class="btn small" onclick="togglePresentationMode()" title="Große Schrift für Beamer/Smartboard">
+      Beamer-Ansicht
+    </button>
+  </header>
 
-    <div id="tabs">
-      <button class="tab-button" data-view="fragen" onclick="showView('fragen')">Fragen</button>
-      <button class="tab-button active" data-view="scan" onclick="showView('scan')">Scan</button>
-      <button class="tab-button" data-view="statistik" onclick="showView('statistik')">Statistik</button>
-      <button onclick="togglePresentationMode()" style="font-size:11px;">Präsentation an/aus</button>
-    </div>
+  <nav id="tabs">
+    <button class="tab-button active" data-view="scan" onclick="showView('scan')">
+      <span class="tab-icon" aria-hidden="true">▶</span>Quiz
+    </button>
+    <button class="tab-button" data-view="fragen" onclick="showView('fragen')">
+      <span class="tab-icon" aria-hidden="true">✎</span>Fragen
+    </button>
+    <button class="tab-button" data-view="statistik" onclick="showView('statistik')">
+      <span class="tab-icon" aria-hidden="true">▤</span>Auswertung
+    </button>
+  </nav>
 
-    <!-- ================= Fragen ================= -->
-    <div id="viewFragen" style="display:none;">
-      <h3>Schnellstart</h3>
-      <button type="button"
-        onclick="QuestionEditor.loadSampleQuestionSet('sample-data/informatik-grundlagen.json')">
-        Beispiel-Fragenset "Informatik Grundlagen" laden
-      </button>
+  <main>
 
-      <h3>Fragenset hochladen (JSON)</h3>
-      <input type="file" id="qsJsonFile" accept="application/json"
-        onchange="QuestionEditor.handleJsonFile(this.files[0])">
+    <!-- ================= Quiz ================= -->
+    <section id="viewScan">
 
-      <h3>Fragenset manuell anlegen</h3>
-      <div>
-        <input type="text" id="qsTitle" placeholder="Titel (z.B. Mathe 7b – Bruchrechnung)" style="width:95%;">
-        <input type="text" id="qsSubject" list="subjectsDatalist" placeholder="Fach" style="width:95%;margin-top:4px;">
+      <div class="teacher-controls">
+        <div id="scanSetupPanel" class="card">
+          <h2>Quiz starten</h2>
+
+          <p id="noSetsHint" class="msg" hidden>
+            Du hast noch keine Fragen.
+            <a href="#" onclick="showView('fragen'); return false;">Jetzt Fragen anlegen</a>
+          </p>
+
+          <label class="field">Fragenset
+            <select id="scanQuestionSetSelect" onchange="onQuestionSetPicked()"></select>
+          </label>
+          <div class="row">
+            <label class="field">Fach
+              <input type="text" id="scanSubjectInput" list="subjectsDatalist" placeholder="z. B. Mathematik">
+            </label>
+            <label class="field">Klasse
+              <input type="text" id="scanClassInput" list="classGroupsDatalist" placeholder="z. B. 7b">
+            </label>
+          </div>
+          <button type="button" class="btn primary big" onclick="handleStartSession()">Quiz starten</button>
+          <div id="scanMessage" class="msg"></div>
+
+          <details>
+            <summary>So funktioniert's</summary>
+            <ol class="steps">
+              <li>Fragenset und Klasse wählen, <b>Quiz starten</b>.</li>
+              <li><b>Kamera starten</b> und auf die Klasse richten.</li>
+              <li>Alle halten ihre Karte hoch. Wenn alle erkannt sind: <b>Alle da – los geht's</b>.</li>
+              <li>Frage vorlesen. Jede:r dreht die Karte so, dass die gewählte Antwort (A–D) oben ist.</li>
+              <li>Wenn alle geantwortet haben: <b>Nächste Frage</b>. Die Antworten werden automatisch gespeichert.</li>
+            </ol>
+          </details>
+        </div>
       </div>
-      <div id="qsQuestionsContainer"></div>
-      <button type="button" onclick="QuestionEditor.addQuestionRow()">Frage hinzufügen</button>
-      <button type="button" onclick="QuestionEditor.saveManualQuestionSet()">Fragenset speichern</button>
-      <div id="qsMessage"></div>
-
-      <h3>KI-Fragengenerierung (F8)</h3>
-      <p style="font-size:13px;">
-        Schickt Themenbereich, Fach und die für dieses Fach hochgeladenen
-        Materialien (siehe unten) an den
-        <a href="architecture.md#ki-komponente-fragengenerierung--tipps">KI-Proxy</a>.
-        Der Vorschlag füllt das Formular oben – dort sichten, bearbeiten und
-        erst mit "Fragenset speichern" übernehmen.
-      </p>
-      <input type="text" id="aiTopic" placeholder="Themenbereich (z.B. Bruchrechnung, Klasse 7)" style="width:95%;">
-      <div style="margin-top:4px;">
-        <input type="text" id="aiSubject" list="subjectsDatalist" placeholder="Fach" style="width:60%;">
-        <input type="number" id="aiCount" min="1" max="20" value="5" style="width:30%;">
-      </div>
-      <button type="button" onclick="AiService.generate()">Fragen generieren</button>
-      <div id="aiMessage"></div>
-
-      <h3>Vorhandene Fragensets</h3>
-      <div id="qsList"></div>
-
-      <h3>Materialien</h3>
-      <p style="font-size:13px;">
-        Unterrichtsmaterialien (Skript, Arbeitsblatt, Folien als .txt/.md/.pdf)
-        pro Fach ablegen. Wird lokal gespeichert und automatisch als Kontext
-        an die KI-Fragengenerierung oben mitgeschickt, siehe
-        <a href="architecture.md#ki-komponente-fragengenerierung--tipps">architecture.md</a>.
-      </p>
-      <input type="text" id="matSubjectInput" list="subjectsDatalist" placeholder="Fach"
-        onchange="Materials.renderList()">
-      <input type="file" id="matFile" accept=".txt,.md,.pdf"
-        onchange="Materials.handleUpload(this.files[0])">
-      <div id="matMessage"></div>
-      <div id="matList"></div>
-    </div>
-
-    <!-- ================= Scan ================= -->
-    <div id="viewScan">
-      <div style="margin: 10px;"><strong>NoNameQuiz</strong></div>
 
       <div class="scan-layout">
-        <div class="scan-camera">
+        <div class="scan-camera card">
           <div id="cameraStatus" style="display:none;font-weight:bold;"></div>
-          <button id="cameraStartBtn" type="button" onclick="initCamera()" style="font-size:18px;padding:10px;">
+          <button id="cameraStartBtn" type="button" class="btn primary" onclick="initCamera()">
             Kamera starten
           </button>
 
-          <video id="video" autoplay muted playsinline></video>
-          <canvas id="canvas"></canvas>
+          <div><video id="video" autoplay muted playsinline></video></div>
+          <canvas id="canvas" style="display:none;"></canvas>
         </div>
 
         <div class="scan-info">
-          <div id="questionDisplayPanel" style="display:none;">
+          <div id="questionDisplayPanel" class="card" style="display:none;">
             <div id="questionProgress"></div>
-            <div id="questionText" style="font-weight:bold;font-size:20px;"></div>
+            <div id="questionText"></div>
             <div id="questionOptionsDisplay"></div>
           </div>
 
           <div class="teacher-controls">
-            <div id="scanSetupPanel">
-              <input type="text" id="scanSubjectInput" list="subjectsDatalist" placeholder="Fach">
-              <input type="text" id="scanClassInput" list="classGroupsDatalist" placeholder="Klasse">
-              <br>
-              <select id="scanQuestionSetSelect"></select>
-              <button type="button" onclick="handleStartSession()">Sitzung starten</button>
-              <div id="scanMessage"></div>
-            </div>
-
             <div id="scanSessionPanel" style="display:none;">
-              <button type="button" onclick="handleNextQuestion()">Nächste Frage</button>
-              <button type="button" onclick="handleEndSession()">Sitzung beenden</button>
+              <div class="btn-row" style="margin:0 0 14px;">
+                <button type="button" class="btn primary" style="flex:1;" onclick="handleNextQuestion()">Nächste Frage →</button>
+                <button type="button" class="btn" onclick="handleEndSession()">Quiz beenden</button>
+              </div>
             </div>
           </div>
 
-          <div id="results">
-            Die Runde ist eröffnet
-          </div>
+          <div id="liveArea" class="card" hidden>
+            <div class="live-grid">
+              <div id="attendance"></div>
+              <div id="missing"></div>
+            </div>
+            <div id="results"></div>
 
-          <div id="attendance">
-            Wer spielt mit?
-          </div>
+            <div class="teacher-controls">
+              <div class="btn-row">
+                <button id="lockButton" class="btn primary" onclick="lockAttendance()">
+                  Alle da – los geht's
+                </button>
+                <button id="editButton" class="btn" onclick="editAttendance()" style="display:none;">
+                  Teilnehmende ändern
+                </button>
+              </div>
 
-          <div id="missing">
-            Alle dabei!
-          </div>
-
-          <div class="teacher-controls">
-            <button id="lockButton" onclick="lockAttendance()" style="font-size:18px;padding:10px;margin:4px;">
-              Team steht fest
-            </button>
-
-            <button id="editButton" onclick="editAttendance()"
-              style="display:none;font-size:18px;padding:10px;margin:4px;">
-              Team ändern
-            </button>
-
-            <div id="attendanceEditor" style="display:none;">
-              <p>Team ändern:</p>
-              <input id="attendanceChanges" type="text" placeholder="+17 -18 -94">
-              <button onclick="applyAttendanceChanges()">Übernehmen</button>
+              <div id="attendanceEditor" style="display:none;">
+                <label class="field">Karten hinzufügen (+) oder entfernen (−)
+                  <div class="row">
+                    <input id="attendanceChanges" type="text" placeholder="z. B. +17 -18">
+                    <button class="btn" style="flex:none;" onclick="applyAttendanceChanges()">Übernehmen</button>
+                  </div>
+                </label>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div style="margin: 15px;"><strong>Powered by <a
-            href="https://damianofalcioni.github.io/js-aruco2/">js-aruco2</a></strong></div>
-    </div>
+      <p class="hint" style="text-align:center;">Kartenerkennung:
+        <a href="https://damianofalcioni.github.io/js-aruco2/">js-aruco2</a></p>
+    </section>
 
-    <!-- ================= Statistik ================= -->
-    <div id="viewStatistik" style="display:none;">
-      <h3>Statistik</h3>
-
-      <select id="statsSubjectSelect" onchange="StatsView.loadSessions()"></select>
-      <select id="statsClassSelect" onchange="StatsView.loadSessions()"></select>
-      <button type="button" onclick="StatsView.loadSessions()">Aktualisieren</button>
-
-      <div id="statsSessionList"></div>
-
-      <div id="statsSessionDetail"></div>
-
-      <div>
-        <button type="button" onclick="StatsView.exportClipboard()">In Zwischenablage kopieren (OneNote)</button>
-        <button type="button" onclick="StatsView.exportCsv()">CSV herunterladen</button>
-        <div id="statsExportMessage"></div>
+    <!-- ================= Fragen ================= -->
+    <section id="viewFragen" style="display:none;">
+      <div class="card">
+        <h2>Meine Fragensets</h2>
+        <div id="qsList"></div>
       </div>
 
-      <div>
-        <button type="button" onclick="StatsView.suggestReview()">Wiederholungsset vorschlagen</button>
-        <p style="font-size:13px;">
-          Hinweis: Erzeugt aktuell dieselben Fragen unverändert erneut
-          (Platzhalter). Ähnliche Fragen, die gezielt die Fehlvorstellung
-          hinter der falschen Antwort abfragen, erstellt künftig die KI,
-          sobald sie angebunden ist.
+      <h2 class="section-title">Neues Fragenset</h2>
+      <div class="choice-grid">
+        <button type="button" class="choice" data-kind="ai" onclick="openCreate('ai')">
+          <span class="choice-title">Mit KI erstellen</span>
+          <span class="choice-sub">Thema eingeben, die KI schlägt Fragen vor</span>
+        </button>
+        <button type="button" class="choice" data-kind="manual" onclick="openCreate('manual')">
+          <span class="choice-title">Selbst schreiben</span>
+          <span class="choice-sub">Fragen und Antworten eintippen</span>
+        </button>
+        <button type="button" class="choice" data-kind="file" onclick="openCreate('file')">
+          <span class="choice-title">Excel-Datei</span>
+          <span class="choice-sub">Fragen in Excel schreiben und hochladen</span>
+        </button>
+      </div>
+      <div id="qsMessage" class="msg"></div>
+
+      <!-- KI -->
+      <div id="panelAi" class="card" style="margin-top:14px;" hidden>
+        <h3>Mit KI erstellen</h3>
+        <div class="row">
+          <label class="field">Fach
+            <input type="text" id="aiSubject" list="subjectsDatalist" placeholder="z. B. Mathematik"
+              oninput="syncMaterialSubject()">
+          </label>
+          <label class="field" style="flex:0 0 110px;">Anzahl
+            <input type="number" id="aiCount" min="1" max="20" value="5">
+          </label>
+        </div>
+        <label class="field">Thema
+          <input type="text" id="aiTopic" placeholder="z. B. Bruchrechnung, Klasse 7">
+        </label>
+
+        <details>
+          <summary>Eigenes Unterrichtsmaterial beifügen (optional)</summary>
+          <p class="hint">
+            Skript oder Arbeitsblatt als .txt, .md oder .pdf. Die KI orientiert sich
+            dann an dem, was im Unterricht behandelt wurde. Das Material wird
+            beim Fach gespeichert und künftig automatisch mitgeschickt.
+          </p>
+          <input type="hidden" id="matSubjectInput">
+          <input type="file" id="matFile" accept=".txt,.md,.pdf"
+            onchange="syncMaterialSubject(); Materials.handleUpload(this.files[0])">
+          <div id="matMessage" class="msg"></div>
+          <div id="matList"></div>
+        </details>
+
+        <button type="button" id="aiGenerateBtn" class="btn primary big" onclick="AiService.generate()">
+          Fragen vorschlagen lassen
+        </button>
+        <div id="aiMessage" class="msg"></div>
+        <p class="hint">Das dauert meist 1–2 Minuten. Bitte die Seite so lange offen lassen.</p>
+      </div>
+
+      <!-- Datei / Beispiel -->
+      <div id="panelFile" class="card" style="margin-top:14px;" hidden>
+        <h3>Fragen aus Excel übernehmen</h3>
+        <p class="hint">
+          1. Vorlage herunterladen und in Excel öffnen.<br>
+          2. Titel, Fach und die Fragen eintragen: pro Zeile Fragetext, vier Antworten
+          und in der letzten Spalte der Buchstabe der richtigen Antwort (A–D).<br>
+          3. Speichern und hier hochladen. Jedes Blatt der Datei wird ein eigenes Fragenset.
         </p>
+        <div class="btn-row">
+          <button type="button" class="btn" onclick="ExcelIO.downloadTemplate()">Excel-Vorlage herunterladen</button>
+          <label class="btn primary">Excel-Datei hochladen
+            <input type="file" id="qsExcelFile" hidden
+              accept=".xlsx,.xls,.ods,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              onchange="QuestionEditor.handleExcelFile(this.files[0]); this.value = '';">
+          </label>
+        </div>
+        <p class="hint">
+          Ein vorhandenes Fragenset ändern: oben bei „Meine Fragensets“ auf „Excel“
+          tippen, die Datei bearbeiten und wieder hochladen. Es wird dann als neues
+          Fragenset gespeichert.
+        </p>
+        <details>
+          <summary>Weitere Möglichkeiten</summary>
+          <label class="field">Fragenset-Datei (.json) vom Gerät wählen
+            <input type="file" id="qsJsonFile" accept="application/json"
+              onchange="QuestionEditor.handleJsonFile(this.files[0])">
+          </label>
+          <p class="hint">Oder zum Ausprobieren:</p>
+        <button type="button" class="btn"
+          onclick="QuestionEditor.loadSampleQuestionSet('sample-data/informatik-grundlagen.json')">
+          Beispiel „Informatik Grundlagen“ laden
+        </button>
+        </details>
+      </div>
+
+      <!-- Editor (für "Selbst schreiben" und zum Prüfen des KI-Vorschlags) -->
+      <div id="qsEditorPanel" class="card" style="margin-top:14px;" hidden>
+        <h3 id="qsEditorTitle">Neues Fragenset</h3>
+        <p id="qsEditorHint" class="msg" hidden></p>
+        <div class="row">
+          <label class="field">Titel
+            <input type="text" id="qsTitle" placeholder="z. B. Bruchrechnung 7b">
+          </label>
+          <label class="field">Fach
+            <input type="text" id="qsSubject" list="subjectsDatalist" placeholder="z. B. Mathematik">
+          </label>
+        </div>
+        <p class="hint">Den Kreis vor der richtigen Antwort antippen.</p>
+        <div id="qsQuestionsContainer"></div>
+        <button type="button" class="btn" onclick="QuestionEditor.addQuestionRow()">+ Frage hinzufügen</button>
+        <div class="btn-row" style="margin-top:14px;">
+          <button type="button" class="btn primary" style="flex:1;" onclick="QuestionEditor.saveManualQuestionSet()">Fragenset speichern</button>
+          <button type="button" class="btn" onclick="cancelEditor()">Verwerfen</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:22px;">
+        <h3>Daten sichern</h3>
+        <p class="hint">
+          Fragen, Materialien und Ergebnisse werden nur in diesem Browser auf diesem
+          Gerät gespeichert. Werden die Browserdaten gelöscht, sind sie weg. Lade
+          deshalb ab und zu eine Sicherung herunter. Damit kannst du die Daten auch
+          auf ein anderes Gerät übertragen.
+        </p>
+        <div class="btn-row">
+          <button type="button" class="btn" onclick="Backup.exportAll()">Sicherung herunterladen</button>
+          <label class="btn">Sicherung einspielen
+            <input type="file" accept=".json,application/json" hidden
+              onchange="Backup.importFile(this.files[0]); this.value = '';">
+          </label>
+        </div>
+        <div id="backupMessage" class="msg"></div>
+        <p class="hint">
+          Beim Einspielen wird nichts gelöscht: Vorhandenes bleibt, Neues kommt dazu,
+          doppelt Vorhandenes wird nicht doppelt angelegt.
+        </p>
+      </div>
+
+      <p class="hint">
+        Nur für den KI-Vorschlag werden Thema und Material kurz an den KI-Server
+        geschickt. Dort wird nichts gespeichert.
+      </p>
+    </section>
+
+    <!-- ================= Auswertung ================= -->
+    <section id="viewStatistik" style="display:none;">
+      <div class="card">
+        <h2>Auswertung</h2>
+        <div class="row">
+          <label class="field">Fach
+            <select id="statsSubjectSelect" onchange="StatsView.loadSessions()"></select>
+          </label>
+          <label class="field">Klasse
+            <select id="statsClassSelect" onchange="StatsView.loadSessions()"></select>
+          </label>
+        </div>
+        <p class="hint">Eine Sitzung antippen, um die Ergebnisse zu sehen.</p>
+        <div id="statsSessionList"></div>
+        <div class="btn-row">
+          <button type="button" id="statsExportAllBtn" class="btn" hidden onclick="StatsView.exportAllExcel()">Alle angezeigten Ergebnisse als Excel herunterladen</button>
+        </div>
+        <div id="statsListMessage" class="msg"></div>
+      </div>
+
+      <div id="statsDetailCard" class="card" hidden>
+        <div id="statsSessionDetail"></div>
+
+        <h3 style="margin-top:18px;">Exportieren</h3>
+        <div class="btn-row">
+          <button type="button" class="btn primary" onclick="StatsView.exportExcel()">Als Excel herunterladen</button>
+          <button type="button" class="btn" onclick="StatsView.exportClipboard()">Kopieren (für OneNote)</button>
+          <button type="button" class="btn" onclick="StatsView.exportCsv()">Als CSV herunterladen</button>
+        </div>
+        <div id="statsExportMessage" class="msg"></div>
+
+        <h3 style="margin-top:18px;">Wiederholen</h3>
+        <p class="hint">Macht aus den Fragen, die oft falsch beantwortet wurden, ein neues Fragenset.</p>
+        <button type="button" class="btn" onclick="StatsView.suggestReview()">Schwierige Fragen finden</button>
         <div id="statsReviewCandidates"></div>
       </div>
-    </div>
+    </section>
 
-  </center>
+  </main>
 
 </body>
 

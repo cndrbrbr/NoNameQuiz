@@ -202,8 +202,52 @@ var Store = (function () {
     });
   }
 
-  function listQuestionSets() {
-    return getAll("questionSets");
+  // Gelöschte Sets, zu denen es noch Quiz-Ergebnisse gibt, sind nur
+  // ausgeblendet (deleted: true) – die Auswertung braucht ihre Fragen weiter.
+  function listQuestionSets(options) {
+    var includeDeleted = options && options.includeDeleted;
+    return getAll("questionSets").then(function (sets) {
+      return includeDeleted
+        ? sets
+        : sets.filter(function (s) {
+            return !s.deleted;
+          });
+    });
+  }
+
+  function deleteQuestionSet(questionSetId) {
+    return Promise.all([
+      getAll("sessions"),
+      get("questionSets", questionSetId),
+      getAllByIndex("questions", "questionSetId", questionSetId),
+    ]).then(function (results) {
+      var used = results[0].some(function (s) {
+        return s.questionSetId === questionSetId;
+      });
+      var questionSet = results[1];
+      if (!questionSet) return { hidden: false };
+      if (used) {
+        questionSet.deleted = true;
+        questionSet.deletedAt = new Date().toISOString();
+        return put("questionSets", questionSet).then(function () {
+          return { hidden: true };
+        });
+      }
+      return tx(["questionSets", "questions"], "readwrite").then(function (t) {
+        return new Promise(function (resolve, reject) {
+          t.objectStore("questionSets").delete(questionSetId);
+          results[2].forEach(function (q) {
+            t.objectStore("questions").delete(q.id);
+          });
+          t.oncomplete = function () {
+            resolve({ hidden: false });
+          };
+          t.onerror = function () {
+            reject(t.error);
+          };
+        });
+      });
+    });
   }
 
   function getQuestionSetWithQuestions(questionSetId) {
@@ -317,6 +361,53 @@ var Store = (function () {
     return remove("materials", materialId);
   }
 
+  // --- Sicherung (alle Daten) -----------------------------------------
+
+  var ALL_STORES = [
+    "subjects",
+    "classGroups",
+    "questionSets",
+    "questions",
+    "sessions",
+    "answerRecords",
+    "materials",
+  ];
+
+  function exportAll() {
+    return Promise.all(ALL_STORES.map(getAll)).then(function (results) {
+      var data = {};
+      ALL_STORES.forEach(function (name, i) {
+        data[name] = results[i];
+      });
+      return data;
+    });
+  }
+
+  // Legt Datensätze an bzw. überschreibt solche mit gleicher id (erneutes
+  // Einspielen derselben Sicherung erzeugt also keine Duplikate). Löscht
+  // nichts. Alles in einer Transaktion: bei einem Fehler wird nichts
+  // übernommen.
+  function importAll(data) {
+    return tx(ALL_STORES, "readwrite").then(function (t) {
+      return new Promise(function (resolve, reject) {
+        ALL_STORES.forEach(function (name) {
+          (data[name] || []).forEach(function (record) {
+            t.objectStore(name).put(record);
+          });
+        });
+        t.oncomplete = function () {
+          resolve();
+        };
+        t.onerror = function () {
+          reject(t.error);
+        };
+        t.onabort = function () {
+          reject(t.error || new Error("Import abgebrochen"));
+        };
+      });
+    });
+  }
+
   return {
     newId: newId,
     listSubjects: listSubjects,
@@ -326,6 +417,7 @@ var Store = (function () {
     findOrCreateClassGroup: findOrCreateClassGroup,
     saveQuestionSet: saveQuestionSet,
     listQuestionSets: listQuestionSets,
+    deleteQuestionSet: deleteQuestionSet,
     getQuestionSetWithQuestions: getQuestionSetWithQuestions,
     createSession: createSession,
     updateSession: updateSession,
@@ -337,5 +429,7 @@ var Store = (function () {
     saveMaterial: saveMaterial,
     listMaterialsForSubject: listMaterialsForSubject,
     deleteMaterial: deleteMaterial,
+    exportAll: exportAll,
+    importAll: importAll,
   };
 })();

@@ -88,6 +88,83 @@ var QuestionEditor = (function () {
     reader.readAsText(file);
   }
 
+  // --- Excel-Upload (siehe excel.js) ------------------------------------
+
+  function handleExcelFile(file) {
+    if (!file) return;
+    setMessage("Excel-Datei wird gelesen …", false);
+    file
+      .arrayBuffer()
+      .then(function (buffer) {
+        var result = ExcelIO.parseQuestionSheets(buffer, file.name.replace(/\.[^.]+$/, ""));
+        // Nacheinander speichern, damit Fächer nicht doppelt angelegt werden.
+        return result.sets
+          .reduce(function (chain, set) {
+            return chain.then(function (saved) {
+              return Store.findOrCreateSubject(set.subject)
+                .then(function (subject) {
+                  return Store.saveQuestionSet({
+                    title: set.title,
+                    subjectId: subject.id,
+                    origin: "manual",
+                    questions: set.questions.map(function (q) {
+                      return {
+                        text: q.text,
+                        optionA: q.options.A,
+                        optionB: q.options.B,
+                        optionC: q.options.C,
+                        optionD: q.options.D,
+                        correctAnswer: q.correctAnswer,
+                      };
+                    }),
+                  });
+                })
+                .then(function (questionSet) {
+                  return saved.concat(questionSet.title + " (" + set.questions.length + " Fragen)");
+                });
+            });
+          }, Promise.resolve([]))
+          .then(function (saved) {
+            if (saved.length) {
+              notifyChanged();
+              renderQuestionSetList();
+            }
+            var text = saved.length ? "Gespeichert: " + saved.join(", ") + "." : "";
+            if (result.errors.length) {
+              text += (text ? " Nicht übernommen – " : "Nicht übernommen – ") + result.errors.join(" | ");
+            }
+            setMessage(text, result.errors.length > 0);
+          });
+      })
+      .catch(function (err) {
+        setMessage("Die Datei konnte nicht gelesen werden: " + err.message, true);
+      });
+  }
+
+  function deleteSet(setId, title) {
+    if (!confirm("Fragenset „" + title + "“ wirklich löschen?")) return;
+    Store.deleteQuestionSet(setId)
+      .then(function (result) {
+        setMessage(
+          "Fragenset „" + title + "“ gelöscht." +
+            (result.hidden ? " Die bisherigen Quiz-Ergebnisse dazu bleiben in der Auswertung erhalten." : ""),
+          false
+        );
+        notifyChanged();
+        renderQuestionSetList();
+      })
+      .catch(function (err) {
+        setMessage("Löschen fehlgeschlagen: " + err.message, true);
+      });
+  }
+
+  function exportExcel(setId) {
+    var promise = setId ? ExcelIO.exportQuestionSet(setId) : ExcelIO.exportAllQuestionSets();
+    promise.catch(function (err) {
+      setMessage(err.message, true);
+    });
+  }
+
   function loadSampleQuestionSet(url) {
     setMessage("Lade Beispiel-Fragenset …", false);
     fetch(url)
@@ -115,34 +192,36 @@ var QuestionEditor = (function () {
     var row = document.createElement("div");
     row.id = rowId;
     row.className = "qs-question-row";
-    row.style.cssText =
-      "border:1px solid #ccc;padding:8px;margin:6px 0;text-align:left;";
 
     row.innerHTML =
-      '<input type="text" class="qs-text" placeholder="Fragetext" style="width:95%;margin-bottom:4px;">' +
+      '<div class="q-head"><span class="q-num"></span>' +
+      '<button type="button" class="btn small danger" onclick="QuestionEditor.removeQuestionRow(\'' +
+      rowId +
+      "')\">Entfernen</button></div>" +
+      '<textarea class="qs-text" rows="2" placeholder="Fragetext"></textarea>' +
       ["A", "B", "C", "D"]
         .map(function (letter) {
           return (
-            '<div style="margin:2px 0;">' +
+            '<label class="opt-row">' +
             '<input type="radio" name="correct-' +
             rowId +
             '" class="qs-correct" value="' +
             letter +
-            '"> ' +
+            '" title="Richtige Antwort">' +
+            '<span class="letter letter-' +
             letter +
-            ": " +
+            '">' +
+            letter +
+            "</span>" +
             '<input type="text" class="qs-option-' +
             letter +
             '" placeholder="Antwort ' +
             letter +
-            '" style="width:70%;">' +
-            "</div>"
+            '">' +
+            "</label>"
           );
         })
-        .join("") +
-      '<button type="button" onclick="QuestionEditor.removeQuestionRow(\'' +
-      rowId +
-      "')\">Frage entfernen</button>";
+        .join("");
 
     container.appendChild(row);
   }
@@ -214,7 +293,8 @@ var QuestionEditor = (function () {
         });
       })
       .then(function (questionSet) {
-        setMessage('Fragenset "' + questionSet.title + '" gespeichert.', false);
+        setMessage('Fragenset "' + questionSet.title + '" gespeichert. Du findest es oben unter „Meine Fragensets“.', false);
+        document.getElementById("qsEditorPanel").hidden = true;
         document.getElementById("qsTitle").value = "";
         document.getElementById("qsSubject").value = "";
         document.getElementById("qsQuestionsContainer").innerHTML = "";
@@ -253,7 +333,11 @@ var QuestionEditor = (function () {
     });
 
     pendingOrigin = "ai";
-    document.getElementById("viewFragen").scrollIntoView({ behavior: "smooth" });
+    document.getElementById("panelAi").hidden = true;
+    openEditor(
+      "KI-Vorschlag prüfen",
+      "Die KI macht Fehler. Bitte jede Frage und die markierte richtige Antwort prüfen, dann speichern."
+    );
   }
 
   // --- Liste bestehender Fragensets -------------------------------------
@@ -272,7 +356,8 @@ var QuestionEditor = (function () {
         });
 
         if (sets.length === 0) {
-          container.innerHTML = "<p>Noch keine Fragensets vorhanden.</p>";
+          container.innerHTML =
+            '<p class="empty">Noch keine Fragensets. Leg unten ein neues an.</p>';
           return;
         }
 
@@ -285,21 +370,39 @@ var QuestionEditor = (function () {
             var subjectName = subjectById[set.subjectId] || "?";
             var originLabel =
               set.origin === "review"
-                ? " (Wiederholung)"
+                ? '<span class="badge">Wiederholung</span>'
                 : set.origin === "ai"
-                ? " (KI)"
+                ? '<span class="badge">KI</span>'
                 : "";
             return (
-              "<div style='border-bottom:1px solid #ddd;padding:4px 0;'>" +
+              '<div class="list-item"><div class="grow">' +
               "<strong>" +
-              set.title +
-              "</strong> – " +
-              subjectName +
+              escapeHtml(set.title) +
+              "</strong>" +
               originLabel +
+              '<div class="sub">' +
+              escapeHtml(subjectName) +
+              " · " +
+              new Date(set.createdAt).toLocaleDateString("de-DE") +
+              "</div></div>" +
+              '<button type="button" class="btn small" title="Als Excel-Datei herunterladen" onclick="QuestionEditor.exportExcel(\'' +
+              set.id +
+              "')\">Excel</button>" +
+              '<button type="button" class="btn small danger" title="Fragenset löschen" onclick="QuestionEditor.deleteSet(\'' +
+              set.id +
+              "', this.dataset.title)\" data-title=\"" +
+              escapeHtml(set.title).replace(/"/g, "&quot;") +
+              '">Löschen</button>' +
+              '<button type="button" class="btn small primary" onclick="prepareQuiz(\'' +
+              set.id +
+              "', '" +
+              escapeHtml(subjectName).replace(/'/g, "\\'") +
+              "')\">Quiz starten</button>" +
               "</div>"
             );
           })
-          .join("");
+          .join("") +
+          '<div class="btn-row"><button type="button" class="btn small" onclick="QuestionEditor.exportExcel()">Alle Fragensets als Excel herunterladen</button></div>';
       }
     );
   }
@@ -308,6 +411,9 @@ var QuestionEditor = (function () {
 
   return {
     handleJsonFile: handleJsonFile,
+    handleExcelFile: handleExcelFile,
+    exportExcel: exportExcel,
+    deleteSet: deleteSet,
     loadSampleQuestionSet: loadSampleQuestionSet,
     addQuestionRow: addQuestionRow,
     removeQuestionRow: removeQuestionRow,

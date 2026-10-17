@@ -72,6 +72,13 @@ immediately, same as before.
 
 ### 1. Fragen — prepare a question set
 
+- **Upload as Excel** (recommended for teachers): download the template
+  ("Excel-Vorlage herunterladen"), fill in title, subject and one question per
+  row (text, answers A–D, correct letter), and upload the file. Every sheet
+  becomes its own question set. Existing sets can be downloaded as Excel
+  ("Excel" button), edited and uploaded again as a new set. Uses the vendored
+  [SheetJS](https://sheetjs.com/) library (`vendor/xlsx.full.min.js`), all in
+  the browser — see `excel.js`.
 - **Upload as JSON**: a file with a `title`, a `subject`, and a `questions` array,
   each question giving `text`, `options.A`–`options.D`, and `correctAnswer`
   (`"A"`–`"D"`) — see the example in [architecture.md](architecture.md#format-für-den-fragen-upload-json).
@@ -111,6 +118,13 @@ immediately, same as before.
 
 Filter by Fach/Klasse, pick a session from the list to see the per-question
 distribution (A/B/C/D counts and correct/total), then either:
+
+- **"Als Excel herunterladen"** — an .xlsx with two sheets: per question
+  (counts, correct answer, % correct) and per card (each card's answer to
+  every question and its score). Below the session list, **"Alle angezeigten
+  Ergebnisse als Excel herunterladen"** exports every session matching the
+  filter: an overview sheet plus one row per individual answer (handy for
+  Excel filters/pivot tables).
 
 - **"In Zwischenablage kopieren (OneNote)"** — copies the result table to the
   clipboard as an HTML table; paste (Ctrl+V) directly into a OneNote page to
@@ -163,12 +177,14 @@ original questions unchanged, clearly marked as a placeholder.
 index.html         — app shell, tabs, camera loop, marker → answer logic
 store.js            — IndexedDB data layer (subjects, classes, question sets,
                        questions, sessions, answer records)
-question-editor.js  — question set upload (JSON), manual builder, and AI-draft review/edit
+question-editor.js  — question set upload (Excel, JSON), manual builder, and AI-draft review/edit
 materials.js        — per-subject teaching material upload (context for AI generation)
 ai-service.js       — talks to the AI proxy (server/) to generate a question set (F8)
 quiz-runner.js      — session/question flow, ties scanning to the active question
 stats-view.js       — results browser (filter, per-question breakdown)
 export.js           — clipboard HTML-table copy + CSV download
+excel.js            — Excel template/import of question sets, Excel export of sets and results
+vendor/xlsx.full.min.js — vendored SheetJS (Apache-2.0) used by excel.js
 review.js           — error-rate calculation and review-set generation
 aruco.js            — vendored js-aruco2 marker detector
 cv.js               — vendored computer-vision helpers used by aruco.js
