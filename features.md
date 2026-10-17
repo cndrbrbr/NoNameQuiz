@@ -25,7 +25,18 @@ werden je Fach und Klasse dauerhaft als Statistik gespeichert.
 - Lehrkraft kann ein **Fragenset** hochladen: pro Frage ein Fragetext, vier
   Antworttexte (A–D) und die als richtig markierte Antwort (Grundlage für
   Auswertung und Wiederholung, siehe F10).
-- Upload entweder als Datei (JSON) oder über ein einfaches Formular in der App.
+- Upload als **Excel-Datei** (Hauptweg für Lehrkräfte, die mit JSON nichts
+  anfangen können): Vorlage herunterladen, je Zeile Frage, Antworten A–D und
+  richtigen Buchstaben eintragen, hochladen. Jedes Blatt wird ein Fragenset;
+  Fehler werden mit Blatt und Zeile gemeldet. Daneben weiterhin JSON und ein
+  einfaches Formular in der App.
+- Fragensets lassen sich einzeln oder alle als Excel herunterladen, in Excel
+  bearbeiten und wieder hochladen (entsteht als neues Set). Auch ein
+  ungespeicherter Entwurf im Editor (z. B. KI-Vorschlag) lässt sich als Excel
+  herunterladen.
+- Fragensets lassen sich löschen. Wurde ein Set schon in einem Quiz
+  verwendet, wird es nur ausgeblendet, damit die Auswertung vollständig
+  bleibt.
 - Ein Fragenset wird einem **Fach** zugeordnet (z. B. "Mathematik") und kann in
   mehreren Sitzungen/Klassen wiederverwendet werden.
 - Bestehende Fragensets lassen sich erneut auswählen, statt jedes Mal neu
@@ -38,7 +49,9 @@ werden je Fach und Klasse dauerhaft als Statistik gespeichert.
 - Aktuelle Frage und die vier Antwortmöglichkeiten (A–D) werden groß und gut
   lesbar angezeigt (für die ganze Klasse sichtbar, z. B. per Beamer oder am
   Lehrer-Gerät vorgelesen).
-- Navigation zwischen den Fragen eines Sets ("nächste Frage").
+- Navigation zwischen den Fragen ("nächste Frage").
+- Beim Start wählt die Lehrkraft, wie viele Fragen aus dem Set gestellt
+  werden (Vorgabe: alle, höchstens 30); welche Fragen das sind, regelt F12.
 - Anzeige, an welcher Position im Fragenset man sich gerade befindet
   (z. B. "Frage 3 von 10").
 
@@ -48,6 +61,11 @@ werden je Fach und Klasse dauerhaft als Statistik gespeichert.
 - Die Ecke der Karte, die nach oben zeigt, kodiert die Antwort A, B, C oder D.
 - Der Scan läuft weiterhin über die Handy-/Tablet-Kamera (bestehende Logik aus
   `index.html`).
+- Schutz vor Fehlerkennungen ("Karten, die es nicht gibt", kurz falsch
+  gelesene Antworten beim Drehen): nur exakt gelesene Muster zählen, und eine
+  Karte samt Antwort gilt erst, wenn sie in drei aufeinanderfolgenden
+  Kamerabildern gleich erkannt wurde. Nach dem Festlegen der Teilnehmenden
+  ("Alle da") zählen nur noch deren Karten.
 
 ### F4 – Live-Auszählung
 
@@ -70,14 +88,22 @@ werden je Fach und Klasse dauerhaft als Statistik gespeichert.
   Frage (siehe F10) und für die KI-Tipps (siehe F11).
 - Historische Statistiken lassen sich später nach Fach und/oder Klasse
   filtern und ansehen (z. B. "alle Ergebnisse von Klasse 7b in Mathematik").
-- Übersicht zeigt z. B. die Verteilung pro Frage; ein Verlauf über mehrere
-  Sitzungen ist eine mögliche spätere Ausbaustufe.
+- Je Quiz: Verteilung A/B/C/D pro Frage (richtige Antwort markiert) mit
+  Gesamtzeile, und **richtig/falsch pro Kartennummer** (✓/✗ je Frage).
+- Über alle Quiz (**kumuliert**): je Frage, wie oft A/B/C/D insgesamt gewählt
+  wurden, und **wann die Frage welcher Klasse gestellt wurde** – mit Anteil
+  richtiger Antworten. Filterbar nach Fach, Klasse und Fragenset. Fragen
+  werden über ihren Text wiedererkannt, damit die Historie auch bei neu
+  hochgeladenen oder kopierten Sets weiterläuft.
 
 ### F6 – Datenexport (inkl. OneNote)
 
-- Export der gespeicherten Statistik als JSON/CSV, damit die Daten nicht
-  ausschließlich im Browser-Speicher eines einzelnen Geräts liegen und bei
-  Bedarf gesichert oder in Excel/Sheets weiterverarbeitet werden können.
+- **Excel-Export** der Ergebnisse: je Quiz (Fragen + Karten), **eine Datei
+  pro Klasse** (Fragen kumuliert mit "gestellt am", Quiz-Übersicht, Karten
+  über alle Quiz, je Quiz richtig/falsch pro Karte, alle Einzelantworten),
+  alle gefilterten Quiz in einer Datei, und die kumulierte Fragenübersicht.
+- Zusätzlich CSV je Quiz, damit die Daten nicht ausschließlich im
+  Browser-Speicher eines einzelnen Geräts liegen.
 - **Komplette Sicherung**: Alle Daten (Fragensets, Materialien, Sitzungen,
   Antworten) lassen sich als eine JSON-Datei herunterladen und – auch auf
   einem anderen Gerät – wieder einspielen. Einspielen ergänzt nur (gleiche
@@ -90,10 +116,15 @@ werden je Fach und Klasse dauerhaft als Statistik gespeichert.
 
 ### F7 – Verwaltung von Fächern/Klassen (optional, spätere Ausbaustufe)
 
+*Teilweise umgesetzt: Fragensets lassen sich löschen (F1). Fächer und
+Klassen entstehen weiterhin beim ersten Gebrauch.*
+
 - Anlegen/Umbenennen von Fächern und Klassen direkt in der App, statt sie nur
   implizit beim ersten Gebrauch entstehen zu lassen.
 
 ### F8 – KI-gestützte Fragengenerierung
+
+*Umgesetzt (Proxy in `server/`, selbstgehostetes Modell).*
 
 - Lehrkraft gibt einen Themenbereich ein (z. B. "Bruchrechnung, Klasse 7").
 - Zusätzlich können eigene Unterrichtsmaterialien (Skript, Arbeitsblatt,
@@ -153,6 +184,21 @@ werden je Fach und Klasse dauerhaft als Statistik gespeichert.
   Steuerungselemente der Lehrkraft (z. B. "Team steht fest", "Neue Frage")
   unauffällig/klein, damit sie die Projektion nicht stören.
 
+### F12 – Fragen priorisieren
+
+*Umgesetzt.*
+
+- Beim Start eines Quiz werden für die gewählte Klasse zuerst Fragen
+  gestellt, die **neu** für diese Klasse sind, dann solche, die **noch nicht
+  erfolgreich** gestellt wurden (in dieser Klasse nie mindestens 60 %
+  richtig; die schwierigsten zuerst), zuletzt bereits gekonnte (die am
+  längsten zurückliegenden zuerst).
+- Zusammen mit der wählbaren Anzahl (F2) kommen so über mehrere Stunden alle
+  Fragen eines großen Sets dran, und Nicht-Gekonntes wird automatisch
+  wiederholt.
+- Vor dem Start zeigt die App, wie viele Fragen des Sets für die Klasse neu,
+  noch nicht sicher oder schon gekonnt sind.
+
 ## Nicht-funktionale Anforderungen
 
 - **Datenhoheit beim Gerät der Lehrkraft:** Unterrichtsmaterialien (F8),
@@ -172,7 +218,9 @@ werden je Fach und Klasse dauerhaft als Statistik gespeichert.
 - Keine Klarnamen der Schüler nötig – nur Kartennummern (Datenschutz). Bei
   KI-Anfragen (F8, F10) werden nur Fragetexte/Statistikwerte übertragen,
   keine personenbezogenen Daten.
-- Bedienbar durch eine Lehrkraft ohne technisches Vorwissen.
+- Bedienbar durch eine Lehrkraft ohne technisches Vorwissen; eine
+  Schritt-für-Schritt-Anleitung ist in der App verlinkt (`anleitung.html`).
+  Fragen und Ergebnisse lassen sich komplett über Excel verwalten.
 
 ## Abgrenzung (vorerst nicht enthalten)
 

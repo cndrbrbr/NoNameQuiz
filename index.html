@@ -83,7 +83,8 @@
       padding: 10px 16px;
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
     }
-    .app-header h1 { font-size: 19px; margin: 0; }
+    a.btn { text-decoration: none; }
+    .app-header h1 { font-size: 19px; margin: 0 auto 0 0; }
 
     /* Navigation unten – mit dem Daumen gut erreichbar */
     #tabs {
@@ -864,6 +865,7 @@
 
   <header class="app-header">
     <h1>NoNameQuiz</h1>
+    <a class="btn small" href="anleitung.html" title="Anleitung für Lehrkräfte">Anleitung</a>
     <button type="button" class="btn small" onclick="togglePresentationMode()" title="Große Schrift für Beamer/Smartboard">
       Beamer-Ansicht
     </button>
@@ -919,12 +921,14 @@
           <details>
             <summary>So funktioniert's</summary>
             <ol class="steps">
-              <li>Fragenset und Klasse wählen, <b>Quiz starten</b>.</li>
+              <li>Fragenset und Klasse wählen, bei Bedarf die Anzahl Fragen ändern, <b>Quiz starten</b>.
+                Neue und noch nicht sichere Fragen der Klasse kommen zuerst dran.</li>
               <li><b>Kamera starten</b> und auf die Klasse richten.</li>
               <li>Alle halten ihre Karte hoch. Wenn alle erkannt sind: <b>Alle da – los geht's</b>.</li>
               <li>Frage vorlesen. Jede:r dreht die Karte so, dass die gewählte Antwort (A–D) oben ist.</li>
               <li>Wenn alle geantwortet haben: <b>Nächste Frage</b>. Die Antworten werden automatisch gespeichert.</li>
             </ol>
+            <p class="hint"><a href="anleitung.html">Ausführliche Anleitung</a></p>
           </details>
         </div>
       </div>

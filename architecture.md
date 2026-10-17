@@ -63,9 +63,13 @@ Weiterhin reine `<script>`-Dateien ohne Bundler, analog zu `aruco.js` etc.:
 | Datei | Aufgabe |
 |---|---|
 | `store.js` | IndexedDB-Zugriffsschicht: CRUD für Subjects, Classes, QuestionSets, Questions, Sessions, AnswerRecords. Promise-basierte API. |
-| `question-editor.js` | UI-Logik für Fragen-Upload (JSON-Import oder Formular), legt QuestionSets/Questions über `store.js` an. |
-| `quiz-runner.js` | Verbindet die bestehende Scan-Logik aus `index.html` mit der aktuell aktiven Frage; schreibt Antworten mit Bezug zur `questionId`; löst die Speicherung beim Wechsel zur nächsten Frage aus. |
-| `stats-view.js` | Anzeige/Filterung gespeicherter Ergebnisse nach Fach/Klasse/Sitzung. |
+| `question-editor.js` | UI-Logik für Fragen-Upload (Excel, JSON oder Formular), Prüfen von KI-Entwürfen, Liste der Fragensets (Excel-Export, Löschen); legt QuestionSets/Questions über `store.js` an. |
+| `quiz-runner.js` | Verbindet die bestehende Scan-Logik aus `index.html` mit der aktuell aktiven Frage; wählt beim Start die Fragen aus (Anzahl + Priorisierung über `analysis.js`); schreibt Antworten mit Bezug zur `questionId`; löst die Speicherung beim Wechsel zur nächsten Frage aus. |
+| `stats-view.js` | Reiter Auswertung: Quiz nach Fach/Klasse filtern, Detail je Quiz (Verteilung, Gesamtzeile, richtig/falsch pro Karte), kumulierte Ansicht "Fragen über alle Quiz", Export-Knöpfe. |
+| `analysis.js` | Rein lesende Auswertung über alle Sitzungen: gestellte Fragen je Sitzung, A–D/richtig je Frage, kumuliert je Frage (Wiedererkennung über den Fragetext), richtig/falsch je Karte, Priorisierung für das nächste Quiz einer Klasse. |
+| `excel.js` | Excel über SheetJS (`vendor/xlsx.full.min.js`): Vorlage, Import von Fragensets, Export von Fragensets/Entwürfen und Ergebnissen (je Quiz, pro Klasse, kumuliert, alle Antworten). |
+| `backup.js` | Komplette Sicherung aller Object-Stores als eine JSON-Datei und Wiedereinspielen (zusammenführend). |
+| `anleitung.html` | Statische Schritt-für-Schritt-Anleitung für Lehrkräfte, aus der App verlinkt. |
 | `ai-service.js` | Kommuniziert mit dem KI-Proxy (nicht direkt mit der KI-API): Fragengenerierung zu einem Themenbereich (F8) und Tipps für die Lehrkraft (F10). |
 | `export.js` | Bereitet Ergebnisse für den Export auf: Kopieren als HTML-Tabelle in die Zwischenablage (für OneNote), Download als CSV/JSON. |
 | `review.js` | Berechnet die Fehlerquote je Frage aus `AnswerRecord` + `Question.correctAnswer` und erzeugt daraus Wiederholungs-Fragensets (F9, Neuformulierung über `ai-service.js`). |
@@ -79,10 +83,10 @@ zu `aruco.js`/`cv.js`/`polyfill.js` ein.
 Empfehlung: **eine** `index.html` mit umschaltbaren Ansichten (Tabs/Views),
 statt mehrerer HTML-Seiten:
 
-1. **Fragen** — Fragenset hochladen/auswählen
-2. **Scan** — Fach/Klasse wählen, Anwesenheit sperren, Frage anzeigen, live
-   scannen (bestehende Kamera-UI)
-3. **Statistik** — gespeicherte Ergebnisse nach Fach/Klasse durchsuchen
+1. **Quiz** (Start-Ansicht) — Fragenset, Klasse und Anzahl wählen,
+   Anwesenheit festlegen, Frage anzeigen, live scannen (bestehende Kamera-UI)
+2. **Fragen** — Fragensets anlegen (Excel, KI, Formular), verwalten, sichern
+3. **Auswertung** — Ergebnisse je Quiz, pro Karte und über alle Quiz, Exporte
 
 Das vermeidet einen Router/ein Framework und passt zur bisherigen
 Ein-Datei-Philosophie. Alternative wäre je eine HTML-Datei pro Ansicht
@@ -170,6 +174,8 @@ erDiagram
         string origin "manual | ai | review"
         string sourceSessionId "nur bei origin=review"
         datetime createdAt
+        bool deleted "ausgeblendet, weil schon in Sitzungen verwendet"
+        datetime deletedAt
     }
     QUESTION {
         string id
@@ -187,6 +193,8 @@ erDiagram
         string subjectId
         string classId
         string questionSetId
+        string[] questionIds "geplante Fragen in Stell-Reihenfolge"
+        string[] askedQuestionIds "tatsaechlich gestellte Fragen"
         date date
         string status
     }
@@ -224,6 +232,14 @@ Hinweise:
 - `QuestionSet.origin` unterscheidet, wie ein Fragenset entstanden ist:
   `manual` (F1), `ai` (F8) oder `review` (F9, automatisch aus einer
   Vorgänger-Sitzung erzeugt, `sourceSessionId` verweist auf diese).
+- `Session.questionIds` hält fest, welche Fragen beim Start ausgewählt
+  wurden (Anzahl + Priorisierung, siehe unten); `askedQuestionIds` wächst mit
+  jeder per "Nächste Frage" abgeschlossenen Frage. Bei älteren Sitzungen ohne
+  diese Felder gilt eine Frage als gestellt, wenn es mindestens einen
+  `AnswerRecord` zu ihr gibt.
+- Löschen eines Fragensets: ohne Sitzungen werden Set und Fragen entfernt;
+  mit Sitzungen wird nur `deleted = true` gesetzt (`listQuestionSets()` blendet
+  es aus, die Auswertung liest weiter `{ includeDeleted: true }`).
 - `Material` ist unabhängig von Fragensets/Sitzungen und hängt nur am Fach:
   Materialien sollen fachübergreifend über mehrere Fragensets/Sitzungen
   hinweg als KI-Kontext wiederverwendbar sein, nicht an ein einzelnes
@@ -241,8 +257,10 @@ sequenceDiagram
     L->>App: Fragenset hochladen (JSON/Formular)
     App->>Store: QuestionSet + Questions speichern
 
-    L->>App: Fach + Klasse waehlen, Sitzung starten
-    App->>Store: neue Session anlegen
+    L->>App: Fragenset, Klasse, Anzahl waehlen, Quiz starten
+    App->>Store: bisherige Sitzungen der Klasse lesen (analysis.js)
+    App->>App: Fragen priorisieren, Anzahl auswaehlen
+    App->>Store: neue Session mit questionIds anlegen
 
     App->>Cam: Scan aktivieren (Anwesenheit)
     L->>App: "Team steht fest"
@@ -252,7 +270,7 @@ sequenceDiagram
         Cam->>App: erkannte Karten + Ecken -> Antworten
         App->>App: Live-Zaehlung aktualisieren
         L->>App: "Naechste Frage"
-        App->>Store: AnswerRecords fuer aktuelle Frage speichern
+        App->>Store: AnswerRecords fuer aktuelle Frage speichern, askedQuestionIds ergaenzen
         App->>App: naechste Frage anzeigen
     end
 
@@ -274,7 +292,21 @@ mitführt, damit beim Speichern klar ist, zu welcher Frage die Antwort gehört.
 Die bestehenden Funktionen `updateResults()`, `lockAttendance()` etc. werden
 dafür minimal erweitert, nicht ersetzt.
 
+**Schutz vor Fehlerkennungen:** Der Detector läuft mit
+`maxHammingDistance: 1`, akzeptiert also nur exakt dekodierte Marker. Der
+Standard von js-aruco2 für das `ARUCO`-Wörterbuch (`tau = 3`) toleriert 2
+falsche Bits; die Codes liegen dort aber nur 3 Bits auseinander, sodass ein
+2-Bit-Lesefehler eine andere, real nicht vorhandene Kartennummer (oder eine
+falsche Drehung = falsche Antwort) ergeben konnte – bei den Karten 1–40 rund
+11 % aller 2-Bit-Fehler. Zusätzlich zählt eine Karte erst, wenn dieselbe ID
+mit derselben Antwort in `CONFIRM_FRAMES = 3` aufeinanderfolgenden Bildern
+erkannt wurde (`markerStreaks` in `index.html`); unbestätigte Marker werden
+grau beschriftet. Die Anzeige wird nur bei Änderungen neu aufgebaut.
+
 ## Format für den Fragen-Upload (JSON)
+
+Für Lehrkräfte ist Excel der Hauptweg (siehe [Excel](#excel-fragen-und-ergebnisse));
+JSON bleibt für technische Nutzung und ist das Format, das der KI-Proxy liefert.
 
 ```json
 {
@@ -294,6 +326,64 @@ dafür minimal erweitert, nicht ersetzt.
   ]
 }
 ```
+
+## Excel (Fragen und Ergebnisse)
+
+Lehrkräfte verwalten Fragen und Ergebnisse in Excel statt JSON. `excel.js`
+nutzt SheetJS Community Edition, vendort als `vendor/xlsx.full.min.js`
+(läuft komplett im Browser, keine Daten verlassen das Gerät, funktioniert
+offline).
+
+**Fragenset-Blatt** (ein Blatt = ein Fragenset):
+
+| | A | B | C | D | E | F |
+|---|---|---|---|---|---|---|
+| 1 | Titel | *Titel* | | | | |
+| 2 | Fach | *Fach* | | | | |
+| 4 | Frage | Antwort A | Antwort B | Antwort C | Antwort D | Richtig (A-D) |
+| 5… | *Fragetext* | … | … | … | … | *B* |
+
+- Beim Import wird die Kopfzeile gesucht (Zelle "Frage" in Spalte A), Titel
+  und Fach stehen in Zeilen darüber. Ohne Titel gilt der Blattname (bzw. der
+  Dateiname). Blätter ohne Kopfzeile (z. B. "Anleitung") werden übersprungen.
+- Ein Blatt mit Fehlern (fehlendes Fach, leere Antwort, Buchstabe außer A–D)
+  wird ganz abgelehnt; die Meldung nennt Blatt und Excel-Zeile. Fehlerfreie
+  Blätter derselben Datei werden trotzdem übernommen.
+- Vorlage und Exporte formatieren die Zellen als Text (`z: "@"`, vorbelegt bis
+  Zeile 200), damit Excel z. B. "1/2" nicht in ein Datum umwandelt.
+- Erneutes Hochladen eines bearbeiteten Sets legt ein **neues** Set an (die
+  Fragen-IDs der alten Sitzungen bleiben gültig); das alte kann gelöscht
+  werden. Die Auswertung verbindet beide über den Fragetext.
+
+**Ergebnis-Exporte** (Daten aus `analysis.js`): je Quiz (Fragen mit
+Gesamtzeile, Karten mit ✓/✗), pro Klasse (Fragen kumuliert mit "gestellt am",
+Quiz-Übersicht, Karten über alle Quiz, je Quiz ein ✓/✗-Blatt, alle Antworten;
+bei mehreren Klassen nacheinander je eine Datei), alle gefilterten Quiz
+(Übersicht, Fragen kumuliert, alle Antworten) und die kumulierte
+Fragenübersicht mit ihren Filtern.
+
+## Auswertung über alle Quiz und Priorisierung
+
+`analysis.js` lädt Fächer, Klassen, Fragensets (inkl. ausgeblendeter),
+Fragen, Sitzungen und AnswerRecords (`Store.getAllFrom`) und baut daraus ein
+Modell im Speicher – Aggregation zur Anzeigezeit, wie beim Datenmodell
+beschlossen, nichts Abgeleitetes wird gespeichert.
+
+- **Frage-Identität:** Fragen werden über ihren normalisierten Text
+  (Kleinbuchstaben, Leerzeichen zusammengefasst) wiedererkannt, nicht über
+  die ID. So zählen auch Sitzungen mit einem per Excel neu hochgeladenen Set
+  oder einem Wiederholungsset (wortgleiche Kopie) zur Historie derselben
+  Frage. Konsequenz: Wer den Fragetext ändert, bekommt eine "neue" Frage.
+- **Kumuliert je Frage:** Summe A/B/C/D und richtig über alle passenden
+  Sitzungen, dazu je Stellung Klasse, Datum und Anteil richtig.
+- **Erfolgreich gestellt:** in einer Klasse mindestens einmal ≥ 60 % richtig
+  (`SUCCESS_RATE`, passend zur Fehlerquote-Schwelle 40 % der Wiederholung).
+- **Priorisierung** (`prioritize(model, questions, classId)`): Gruppe 0 = in
+  dieser Klasse nie gestellt; Gruppe 1 = gestellt, aber nie erfolgreich
+  (aufsteigend nach bestem Anteil, ohne Antworten zuerst); Gruppe 2 =
+  erfolgreich (der am längsten zurückliegende zuerst). Innerhalb einer Gruppe
+  bleibt die Reihenfolge des Sets. `quiz-runner.js` nimmt davon die ersten N
+  (Vorgabe alle, `MAX_QUESTIONS = 30`) und stellt sie in dieser Reihenfolge.
 
 ## KI-Komponente: Fragengenerierung & Tipps
 
@@ -384,9 +474,10 @@ Backend-Infrastruktur erfordern — unverhältnismäßig für den Zweck):
    Zwischenablage. OneNote erkennt beim Einfügen (Strg+V) HTML-Tabellen im
    Clipboard und erzeugt daraus eine native OneNote-Tabelle — ohne
    Zwischenschritt über eine Datei.
-2. **Sekundär – Datei-Download (CSV/JSON):** als Backup bzw. für Browser/
-   Geräte, auf denen die Clipboard-API eingeschränkt ist, und für die
-   allgemeine Datensicherung (siehe "Offene Punkte" unten).
+2. **Sekundär – Datei-Download (Excel/CSV):** für Browser/Geräte, auf denen
+   die Clipboard-API eingeschränkt ist, und zur Weiterverarbeitung (siehe
+   Abschnitt [Excel](#excel-fragen-und-ergebnisse)). Die komplette
+   Datensicherung läuft über `backup.js` (JSON).
 
 Phase 2 (optional, falls gewünscht): direkte OneNote-API-Anbindung über
 Microsoft Graph, würde aber einen OAuth-Flow und eine Backend-Komponente
@@ -476,7 +567,15 @@ Datenhoheit-Anforderung uneingeschränkt.
   Fallback.
 - **Schwellwert für die Fehlerquote (F9)** ist ein Startwert (40 %), der sich
   in der Praxis als zu hoch/niedrig herausstellen kann und ggf. einstellbar
-  gemacht werden sollte.
+  gemacht werden sollte. Dieselbe Grenze (60 % richtig) bestimmt in der
+  Priorisierung, was als "gekonnt" gilt.
+- **Frage-Identität über den Text** (siehe oben): geänderte Fragetexte
+  beginnen eine neue Historie; zwei verschiedene Sets mit wortgleicher Frage
+  teilen sich eine.
+- **Bearbeitete Sets per Excel erzeugen neue Sets**; aufräumen muss die
+  Lehrkraft über "Löschen".
+- **"Quiz beenden" mitten in einer Frage** speichert die Antworten dieser
+  Frage nicht (nur bereits mit "Nächste Frage" abgeschlossene).
 
 ## Implementierungsplan
 
@@ -493,17 +592,23 @@ Datenhoheit-Anforderung uneingeschränkt.
 6. ✅ Präsentationsmodus (F11): Layout der Scan-Ansicht für Projektion
    angepasst, Steuerungselemente dezent/ausblendbar.
 7. ✅ Fehlerquote je Frage (`review.js`), interimsweise Wiederholungsset als
-   wortgleiche Kopie (Platzhalter, klar als solcher markiert), bis Schritt 9
+   wortgleiche Kopie (Platzhalter, klar als solcher markiert), bis Schritt 13
    steht. `materials.js`: Upload/Verwaltung von Unterrichtsmaterialien pro
    Fach (IndexedDB, noch ohne KI-Anbindung).
 8. ✅ KI-Proxy (minimaler Server) + `ai-service.js`: `/api/generate-questions`
    (F8, inkl. Materialien als Kontext) implementiert, siehe `server/` und
    ["KI-Komponente"](#ki-komponente-fragengenerierung--tipps).
-9. ⬜ `/api/generate-review-questions` (F9): `review.js`/`ai-service.js`
+9. ✅ Excel-Import/-Export für Fragen und Ergebnisse (`excel.js`),
+   komplette Datensicherung (`backup.js`), Fragensets löschen.
+10. ✅ Robuste Kartenerkennung (exakte Marker, 3-Bild-Bestätigung).
+11. ✅ Auswertung über alle Quiz, richtig/falsch pro Karte, Excel pro Klasse,
+    Anzahl Fragen und Priorisierung beim Start (`analysis.js`, F12).
+12. ✅ Anleitung für Lehrkräfte (`anleitung.html`).
+13. ⬜ `/api/generate-review-questions` (F9): `review.js`/`ai-service.js`
    ersetzen die Platzhalter-Kopie aus Schritt 7 durch echte, neu formulierte
    Fragen zur jeweiligen Fehlvorstellung.
-10. ⬜ KI-Tipps für die Lehrkraft (F10), `/api/teaching-tips`, aufbauend auf
+14. ⬜ KI-Tipps für die Lehrkraft (F10), `/api/teaching-tips`, aufbauend auf
     dem Proxy aus Schritt 8.
-11. ⬜ Optional: Verwaltung von Fächern/Klassen direkt in der App.
-12. ⬜ Optional, später: Server-Sync für Mehrgeräte-Nutzung sowie
+15. ⬜ Optional: Verwaltung von Fächern/Klassen direkt in der App.
+16. ⬜ Optional, später: Server-Sync für Mehrgeräte-Nutzung sowie
     Companion-Display für den Präsentationsmodus (Phase 2).
