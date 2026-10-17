@@ -112,27 +112,43 @@ var QuizRunner = (function () {
       return;
     }
 
+    var count = parseInt(document.getElementById("scanQuestionCount").value, 10);
+
     Promise.all([
       Store.findOrCreateSubject(subjectName),
       Store.findOrCreateClassGroup(classGroupName),
       Store.getQuestionSetWithQuestions(questionSetId),
+      Analysis.load(),
     ])
       .then(function (results) {
         var subject = results[0];
         var classGroup = results[1];
         var questionSet = results[2];
+        var model = results[3];
 
         if (!questionSet || questionSet.questions.length === 0) {
           throw new Error("Fragenset ist leer.");
         }
 
+        // Neue und noch nicht erfolgreich gestellte Fragen zuerst.
+        var max = Math.min(questionSet.questions.length, Analysis.MAX_QUESTIONS);
+        if (!(count >= 1)) count = max;
+        var questions = Analysis.prioritize(model, questionSet.questions, classGroup.id)
+          .slice(0, Math.min(count, max))
+          .map(function (p) {
+            return p.question;
+          });
+
         return Store.createSession({
           subjectId: subject.id,
           classId: classGroup.id,
           questionSetId: questionSet.id,
+          questionIds: questions.map(function (q) {
+            return q.id;
+          }),
         }).then(function (session) {
           currentSession = session;
-          currentQuestions = questionSet.questions;
+          currentQuestions = questions;
           currentQuestionIndex = 0;
           responses = {};
 
@@ -160,7 +176,10 @@ var QuizRunner = (function () {
     var question = getCurrentQuestion();
 
     var save = question
-      ? Store.saveAnswerRecords(currentSession.id, question.id, responses)
+      ? Store.saveAnswerRecords(currentSession.id, question.id, responses).then(function () {
+          currentSession.askedQuestionIds = (currentSession.askedQuestionIds || []).concat(question.id);
+          return Store.updateSession(currentSession.id, { askedQuestionIds: currentSession.askedQuestionIds });
+        })
       : Promise.resolve();
 
     save.then(function () {

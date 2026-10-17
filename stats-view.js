@@ -48,6 +48,7 @@ var StatsView = (function () {
       var classById = indexBy(results[2]);
       var setById = indexBy(results[3]);
 
+      renderCumulative();
       var list = document.getElementById("statsSessionList");
       listedSessionIds = sessions.map(function (s) {
         return s.id;
@@ -106,89 +107,191 @@ var StatsView = (function () {
     document.getElementById("statsExportMessage").textContent = "";
     loadSessions();
 
-    Promise.all([
-      Store.getSession(sessionId),
-      Store.listAnswerRecordsForSession(sessionId),
-    ]).then(function (results) {
-      var session = results[0];
-      var records = results[1];
-
-      Store.getQuestionSetWithQuestions(session.questionSetId).then(
-        function (questionSet) {
-          var rows = questionSet.questions.map(function (question) {
-            var questionRecords = records.filter(function (r) {
-              return r.questionId === question.id;
-            });
-            var counts = { A: 0, B: 0, C: 0, D: 0 };
-            var correctCount = 0;
-            questionRecords.forEach(function (r) {
-              counts[r.answer] = (counts[r.answer] || 0) + 1;
-              if (r.answer === question.correctAnswer) correctCount++;
-            });
-            return {
-              question: question,
-              counts: counts,
-              correctCount: correctCount,
-              total: questionRecords.length,
-            };
-          });
-
-          currentSessionDetail = {
-            session: session,
-            questionSet: questionSet,
-            rows: rows,
-          };
-          renderDetail();
-        }
-      );
+    Analysis.load().then(function (model) {
+      var e = Analysis.entry(model, sessionId);
+      if (!e) return;
+      currentSessionDetail = {
+        session: e.session,
+        questionSet: e.set,
+        entry: e,
+        rows: e.asked.map(function (q) {
+          var st = e.stats[q.id];
+          return { question: q, counts: st.counts, correctCount: st.correct, total: st.total };
+        }),
+      };
+      renderDetail();
     });
+  }
+
+  function countCell(row, letter) {
+    var isCorrect = row.question.correctAnswer === letter;
+    return (
+      '<td class="num' + (isCorrect ? ' correct-col" title="richtige Antwort' : "") + '">' +
+      row.counts[letter] +
+      "</td>"
+    );
   }
 
   function renderDetail() {
     var container = document.getElementById("statsSessionDetail");
     if (!container || !currentSessionDetail) return;
+    var d = currentSessionDetail;
+    var e = d.entry;
 
-    var rowsHtml = currentSessionDetail.rows
+    var sum = { A: 0, B: 0, C: 0, D: 0, correct: 0, total: 0 };
+    var rowsHtml = d.rows
       .map(function (row, i) {
-        var q = row.question;
+        Analysis.LETTERS.forEach(function (l) {
+          sum[l] += row.counts[l];
+        });
+        sum.correct += row.correctCount;
+        sum.total += row.total;
         return (
-          "<tr>" +
-          "<td>" +
-          (i + 1) +
-          "</td><td>" +
-          escapeHtml(q.text) +
-          '</td><td class="num">' +
-          row.counts.A +
-          "</td><td>" +
-          row.counts.B +
-          "</td><td>" +
-          row.counts.C +
-          "</td><td>" +
-          row.counts.D +
-          "</td><td>" +
-          row.correctCount +
-          "/" +
-          row.total +
-          "</td>" +
-          "</tr>"
+          "<tr><td>" + (i + 1) + "</td><td>" + escapeHtml(row.question.text) + "</td>" +
+          Analysis.LETTERS.map(function (l) {
+            return countCell(row, l);
+          }).join("") +
+          '<td class="num">' + row.correctCount + "/" + row.total + "</td>" +
+          '<td class="num">' + Analysis.formatPercent(row.total ? row.correctCount / row.total : null) + "</td></tr>"
+        );
+      })
+      .join("");
+
+    var totalRow =
+      '<tr class="sum-row"><td></td><td>Gesamt</td>' +
+      Analysis.LETTERS.map(function (l) {
+        return '<td class="num">' + sum[l] + "</td>";
+      }).join("") +
+      '<td class="num">' + sum.correct + "/" + sum.total + "</td>" +
+      '<td class="num">' + Analysis.formatPercent(sum.total ? sum.correct / sum.total : null) + "</td></tr>";
+
+    // Richtig/falsch je Karte
+    var cardHeader =
+      "<tr><th>Karte</th>" +
+      d.rows.map(function (row, i) {
+        return '<th class="num" title="' + escapeHtml(row.question.text) + '">' + (i + 1) + "</th>";
+      }).join("") +
+      '<th class="num">Richtig</th></tr>';
+    var cardRows = e.cardIds
+      .map(function (cardId) {
+        var answers = e.cards[cardId];
+        var res = Analysis.cardResult(e, cardId);
+        return (
+          "<tr><td>" + cardId + "</td>" +
+          d.rows.map(function (row) {
+            var a = answers[row.question.id];
+            if (!a) return '<td class="num muted">–</td>';
+            var ok = a === row.question.correctAnswer;
+            return '<td class="num ' + (ok ? "ok" : "bad") + '">' + a + (ok ? " ✓" : " ✗") + "</td>";
+          }).join("") +
+          '<td class="num">' + res.correct + "/" + res.answered + "</td></tr>"
         );
       })
       .join("");
 
     container.innerHTML =
-      "<h3>" +
-      escapeHtml(currentSessionDetail.questionSet.title) +
-      "</h3>" +
-      '<div class="table-wrap"><table class="stats-table">' +
-      '<tr><th>#</th><th>Frage</th><th class="num">A</th><th class="num">B</th><th class="num">C</th><th class="num">D</th><th class="num">Richtig</th></tr>' +
-      rowsHtml +
-      "</table></div>";
+      "<h3>" + escapeHtml(d.questionSet.title) + "</h3>" +
+      '<p class="hint">' + escapeHtml(e.subject) + " · Klasse " + escapeHtml(e.className) + " · " +
+      e.date.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) + "</p>" +
+      (d.rows.length === 0
+        ? '<p class="empty">In diesem Quiz wurde noch keine Frage abgeschlossen.</p>'
+        : '<div class="table-wrap"><table class="stats-table">' +
+          '<tr><th>#</th><th>Frage</th><th class="num">A</th><th class="num">B</th><th class="num">C</th><th class="num">D</th><th class="num">Richtig</th><th class="num">%</th></tr>' +
+          rowsHtml + totalRow +
+          "</table></div>" +
+          '<p class="hint">Die richtige Antwort ist grün hinterlegt.</p>' +
+          "<h3 style=\"margin-top:18px;\">Richtig / falsch pro Karte</h3>" +
+          (e.cardIds.length
+            ? '<div class="table-wrap"><table class="stats-table card-table">' + cardHeader + cardRows + "</table></div>"
+            : '<p class="empty">Keine Antworten gespeichert.</p>'));
 
     var card = document.getElementById("statsDetailCard");
     if (card) {
       card.hidden = false;
       card.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+  }
+
+  // --- Fragen über alle Quiz (kumuliert) ----------------------------------
+
+  function currentFilter() {
+    return {
+      subjectId: document.getElementById("statsSubjectSelect").value || undefined,
+      classId: document.getElementById("statsClassSelect").value || undefined,
+      questionSetId: document.getElementById("statsSetSelect").value || undefined,
+    };
+  }
+
+  function renderCumulative() {
+    var container = document.getElementById("statsCumulative");
+    if (!container) return;
+    var filter = currentFilter();
+    Promise.all([Analysis.load(), Store.listQuestionSets()]).then(function (results) {
+      var model = results[0];
+      var setSelect = document.getElementById("statsSetSelect");
+      var previous = setSelect.value;
+      var sets = results[1].slice().sort(function (a, b) {
+        return a.title.localeCompare(b.title, "de");
+      });
+      setSelect.innerHTML =
+        '<option value="">Alle gestellten Fragen</option>' +
+        sets.map(function (s) {
+          return '<option value="' + s.id + '">' + escapeHtml(s.title) + "</option>";
+        }).join("");
+      setSelect.value = previous;
+      filter.questionSetId = setSelect.value || undefined;
+
+      var rows = Analysis.questionSummary(model, filter);
+      if (rows.length === 0) {
+        container.innerHTML = '<p class="empty">Noch keine Fragen gestellt.</p>';
+        return;
+      }
+      container.innerHTML =
+        '<div class="table-wrap"><table class="stats-table">' +
+        '<tr><th>Frage</th><th class="num">A</th><th class="num">B</th><th class="num">C</th><th class="num">D</th><th class="num">%</th><th>Gestellt</th></tr>' +
+        rows.map(function (r) {
+          var row = { question: r.question, counts: r.counts };
+          return (
+            "<tr><td>" + escapeHtml(r.question.text) +
+            (filter.questionSetId || r.setTitles.length === 0 ? "" : '<div class="sub">' + escapeHtml(r.setTitles.join(", ")) + "</div>") +
+            "</td>" +
+            Analysis.LETTERS.map(function (l) {
+              return countCell(row, l);
+            }).join("") +
+            '<td class="num">' + Analysis.formatPercent(r.rate) + "</td>" +
+            '<td class="asked">' +
+            (r.askings.length
+              ? r.askings.map(function (a) {
+                  var cls = a.rate === null ? "" : a.rate >= Analysis.SUCCESS_RATE ? " ok" : " bad";
+                  return '<span class="chip' + cls + '">' + escapeHtml(Analysis.askingLabel(a, true)) + "</span>";
+                }).join(" ")
+              : '<span class="badge">neu</span>') +
+            "</td></tr>"
+          );
+        }).join("") +
+        "</table></div>" +
+        '<p class="hint">A–D: wie oft die Antwort insgesamt gewählt wurde (richtige grün). ' +
+        "Gestellt: Klasse, Datum und Anteil richtig – grün ab " + Math.round(Analysis.SUCCESS_RATE * 100) + " %.</p>";
+    });
+  }
+
+  function exportClassFiles() {
+    var el = document.getElementById("statsListMessage");
+    var classId = document.getElementById("statsClassSelect").value;
+    var subjectId = document.getElementById("statsSubjectSelect").value;
+    ExcelIO.exportClasses({ classId: classId || undefined, subjectId: subjectId || undefined })
+      .then(function (count) {
+        if (el) {
+          el.textContent = count > 1 ? count + " Excel-Dateien heruntergeladen (eine pro Klasse)." : "";
+          el.style.color = "green";
+        }
+      })
+      .catch(function (err) {
+        if (el) {
+          el.textContent = err.message;
+          el.style.color = "crimson";
+        }
+      });
   }
 
   function buildHtmlTable() {
@@ -251,7 +354,8 @@ var StatsView = (function () {
     return String(str)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
   function exportClipboard() {
@@ -368,6 +472,8 @@ var StatsView = (function () {
     exportClipboard: exportClipboard,
     exportCsv: exportCsv,
     exportExcel: exportExcel,
+    exportClassFiles: exportClassFiles,
+    renderCumulative: renderCumulative,
     exportAllExcel: exportAllExcel,
     suggestReview: suggestReview,
     createReviewSet: createReviewSet,

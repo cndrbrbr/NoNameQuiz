@@ -268,12 +268,16 @@ var Store = (function () {
   // --- Sessions ---------------------------------------------------------
 
   function createSession(data) {
-    // data: { subjectId, classId, questionSetId }
+    // data: { subjectId, classId, questionSetId, questionIds }
+    // questionIds: geplante Fragen in Stell-Reihenfolge; askedQuestionIds
+    // wächst mit jeder tatsächlich gestellten Frage (siehe QuizRunner).
     var session = {
       id: newId(),
       subjectId: data.subjectId,
       classId: data.classId,
       questionSetId: data.questionSetId,
+      questionIds: data.questionIds || null,
+      askedQuestionIds: [],
       date: new Date().toISOString(),
       status: "active",
     };
@@ -373,6 +377,16 @@ var Store = (function () {
     "materials",
   ];
 
+  function getAllFrom(storeNames) {
+    return Promise.all(storeNames.map(getAll)).then(function (results) {
+      var data = {};
+      storeNames.forEach(function (name, i) {
+        data[name] = results[i];
+      });
+      return data;
+    });
+  }
+
   function exportAll() {
     return Promise.all(ALL_STORES.map(getAll)).then(function (results) {
       var data = {};
@@ -429,6 +443,7 @@ var Store = (function () {
     saveMaterial: saveMaterial,
     listMaterialsForSubject: listMaterialsForSubject,
     deleteMaterial: deleteMaterial,
+    getAllFrom: getAllFrom,
     exportAll: exportAll,
     importAll: importAll,
   };

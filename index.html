@@ -15,6 +15,7 @@
   <script src="excel.js"></script>
   <script src="backup.js"></script>
   <script src="review.js"></script>
+  <script src="analysis.js"></script>
   <script src="question-editor.js"></script>
   <script src="materials.js"></script>
   <script src="ai-service.js"></script>
@@ -282,6 +283,16 @@
     .stats-table th, .stats-table td { border-bottom: 1px solid var(--line); padding: 6px 4px; text-align: left; vertical-align: top; }
     .stats-table td:nth-child(n+3), .stats-table th:nth-child(n+3) { text-align: center; white-space: nowrap; }
     .table-wrap { overflow-x: auto; }
+    .stats-table .correct-col { background: var(--ok-soft); font-weight: 700; }
+    .stats-table .sum-row td { font-weight: 700; border-top: 2px solid var(--line); }
+    .stats-table td.ok { color: var(--ok); }
+    .stats-table td.bad { color: var(--err); }
+    .stats-table td.muted { color: var(--muted); }
+    .stats-table .sub { color: var(--muted); font-size: 12px; }
+    .stats-table td.asked { text-align: left !important; white-space: normal !important; min-width: 160px; }
+    .stats-table .asked .chip { display: inline-block; margin: 1px 0; font-size: 12px; }
+    .chip.ok { background: var(--ok-soft); }
+    .chip.bad { background: var(--err-soft); }
   </style>
 
   <script>
@@ -385,11 +396,45 @@
       select.value = questionSetId;
       document.getElementById("scanSubjectInput").value = subjectName || "";
       document.getElementById("scanClassInput").focus();
+      updateQuizPlan(true);
+    }
+
+    // Anzahl Fragen (Vorgabe: alle, höchstens 30) und Hinweis, wie viele
+    // Fragen für die gewählte Klasse neu / noch offen / schon gekonnt sind.
+    function updateQuizPlan(resetCount) {
+      var id = document.getElementById("scanQuestionSetSelect").value;
+      var countInput = document.getElementById("scanQuestionCount");
+      var hint = document.getElementById("scanPlanHint");
+      if (!id) {
+        hint.textContent = "";
+        return;
+      }
+      var className = document.getElementById("scanClassInput").value.trim().toLowerCase();
+      Promise.all([Store.getQuestionSetWithQuestions(id), Store.listClassGroups(), Analysis.load()]).then(function (r) {
+        var set = r[0];
+        if (!set) return;
+        var max = Math.min(set.questions.length, Analysis.MAX_QUESTIONS);
+        countInput.max = max;
+        if (resetCount || !countInput.value || parseInt(countInput.value, 10) > max) countInput.value = max;
+
+        var text = set.questions.length + " Fragen im Set";
+        if (set.questions.length > Analysis.MAX_QUESTIONS) text += " (höchstens " + Analysis.MAX_QUESTIONS + " pro Quiz)";
+        var classGroup = r[1].filter(function (c) { return c.name.toLowerCase() === className; })[0];
+        if (classGroup) {
+          var g = Analysis.groupCounts(Analysis.prioritize(r[2], set.questions, classGroup.id));
+          text += ". Für " + classGroup.name + ": " + g.neu + " neu, " + g.offen + " noch nicht sicher, " +
+            g.gekonnt + " schon gekonnt. Neue und unsichere kommen zuerst dran.";
+        } else if (className) {
+          text += ". Neue Klasse: alle Fragen sind neu.";
+        }
+        hint.textContent = text;
+      });
     }
 
     // Fach automatisch aus dem gewählten Fragenset übernehmen.
     function onQuestionSetPicked() {
       var id = document.getElementById("scanQuestionSetSelect").value;
+      updateQuizPlan(true);
       if (!id) return;
       Promise.all([Store.listQuestionSets(), Store.listSubjects()]).then(function (r) {
         var set = r[0].filter(function (s) { return s.id === id; })[0];
@@ -858,8 +903,15 @@
               <input type="text" id="scanSubjectInput" list="subjectsDatalist" placeholder="z. B. Mathematik">
             </label>
             <label class="field">Klasse
-              <input type="text" id="scanClassInput" list="classGroupsDatalist" placeholder="z. B. 7b">
+              <input type="text" id="scanClassInput" list="classGroupsDatalist" placeholder="z. B. 7b"
+                oninput="updateQuizPlan(false)" onchange="updateQuizPlan(false)">
             </label>
+          </div>
+          <div class="row">
+            <label class="field" style="flex:0 0 130px;">Anzahl Fragen
+              <input type="number" id="scanQuestionCount" min="1" max="30" inputmode="numeric">
+            </label>
+            <p id="scanPlanHint" class="hint" style="align-self:center;margin:0;"></p>
           </div>
           <button type="button" class="btn primary big" onclick="handleStartSession()">Quiz starten</button>
           <div id="scanMessage" class="msg"></div>
@@ -1099,10 +1151,16 @@
         <p class="hint">Eine Sitzung antippen, um die Ergebnisse zu sehen.</p>
         <div id="statsSessionList"></div>
         <div class="btn-row">
+          <button type="button" class="btn" onclick="StatsView.exportClassFiles()">Excel pro Klasse herunterladen</button>
           <button type="button" id="statsExportAllBtn" class="btn" hidden onclick="StatsView.exportAllExcel()">Alle angezeigten Ergebnisse als Excel herunterladen</button>
         </div>
+        <p class="hint">
+          „Excel pro Klasse“: eine Datei je Klasse mit allen Quiz dieser Klasse
+          (oder nur der oben gewählten Klasse).
+        </p>
         <div id="statsListMessage" class="msg"></div>
       </div>
+
 
       <div id="statsDetailCard" class="card" hidden>
         <div id="statsSessionDetail"></div>
@@ -1119,6 +1177,15 @@
         <p class="hint">Macht aus den Fragen, die oft falsch beantwortet wurden, ein neues Fragenset.</p>
         <button type="button" class="btn" onclick="StatsView.suggestReview()">Schwierige Fragen finden</button>
         <div id="statsReviewCandidates"></div>
+      </div>
+
+      <div class="card">
+        <h2>Fragen über alle Quiz</h2>
+        <p class="hint">Wie oft jede Antwort insgesamt gewählt wurde und wann die Frage welcher Klasse gestellt wurde. Fach und Klasse oben filtern mit.</p>
+        <label class="field">Fragenset
+          <select id="statsSetSelect" onchange="StatsView.renderCumulative()"></select>
+        </label>
+        <div id="statsCumulative"></div>
       </div>
     </section>
 

@@ -132,6 +132,21 @@ distribution (A/B/C/D counts and correct/total), then either:
 - **"CSV herunterladen"** — downloads the same data as a CSV file (fallback,
   or for further processing).
 
+The session view also has a **total row** and a **right/wrong table per card
+number** (✓/✗ per question). Below it, **"Fragen über alle Quiz"** shows, per
+question, how often A/B/C/D were chosen across all quizzes (filtered by
+Fach/Klasse/Fragenset) and when the question was asked to which class, with
+the share of correct answers. **"Excel pro Klasse herunterladen"** creates one
+workbook per class (questions cumulated, quiz overview, cards across all
+quizzes, one right/wrong sheet per quiz, all answers).
+
+**Question selection at quiz start:** "Anzahl Fragen" defaults to all
+questions of the set, at most 30. Questions are picked and asked in this
+order: new for this class → asked but never ≥60 % correct in this class
+(worst first) → already mastered (longest ago first). Questions are matched by
+their text, so history carries over to re-uploaded or copied sets. See
+`analysis.js`.
+
 **"Wiederholungsset vorschlagen"** lists questions from that session with a
 high error rate (≥40% by default) and lets you turn the selected ones into a
 new "Wiederholung …" question set for the next session with that class.
@@ -183,6 +198,7 @@ ai-service.js       — talks to the AI proxy (server/) to generate a question s
 quiz-runner.js      — session/question flow, ties scanning to the active question
 stats-view.js       — results browser (filter, per-question breakdown)
 export.js           — clipboard HTML-table copy + CSV download
+analysis.js         — cross-quiz statistics (per question/class/card) and question prioritisation
 excel.js            — Excel template/import of question sets, Excel export of sets and results
 vendor/xlsx.full.min.js — vendored SheetJS (Apache-2.0) used by excel.js
 review.js           — error-rate calculation and review-set generation
