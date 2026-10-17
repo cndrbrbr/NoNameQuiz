@@ -88,6 +88,66 @@ var QuestionEditor = (function () {
     reader.readAsText(file);
   }
 
+  // --- Excel-Upload (siehe excel.js) ------------------------------------
+
+  function handleExcelFile(file) {
+    if (!file) return;
+    setMessage("Excel-Datei wird gelesen …", false);
+    file
+      .arrayBuffer()
+      .then(function (buffer) {
+        var result = ExcelIO.parseQuestionSheets(buffer, file.name.replace(/\.[^.]+$/, ""));
+        // Nacheinander speichern, damit Fächer nicht doppelt angelegt werden.
+        return result.sets
+          .reduce(function (chain, set) {
+            return chain.then(function (saved) {
+              return Store.findOrCreateSubject(set.subject)
+                .then(function (subject) {
+                  return Store.saveQuestionSet({
+                    title: set.title,
+                    subjectId: subject.id,
+                    origin: "manual",
+                    questions: set.questions.map(function (q) {
+                      return {
+                        text: q.text,
+                        optionA: q.options.A,
+                        optionB: q.options.B,
+                        optionC: q.options.C,
+                        optionD: q.options.D,
+                        correctAnswer: q.correctAnswer,
+                      };
+                    }),
+                  });
+                })
+                .then(function (questionSet) {
+                  return saved.concat(questionSet.title + " (" + set.questions.length + " Fragen)");
+                });
+            });
+          }, Promise.resolve([]))
+          .then(function (saved) {
+            if (saved.length) {
+              notifyChanged();
+              renderQuestionSetList();
+            }
+            var text = saved.length ? "Gespeichert: " + saved.join(", ") + "." : "";
+            if (result.errors.length) {
+              text += (text ? " Nicht übernommen – " : "Nicht übernommen – ") + result.errors.join(" | ");
+            }
+            setMessage(text, result.errors.length > 0);
+          });
+      })
+      .catch(function (err) {
+        setMessage("Die Datei konnte nicht gelesen werden: " + err.message, true);
+      });
+  }
+
+  function exportExcel(setId) {
+    var promise = setId ? ExcelIO.exportQuestionSet(setId) : ExcelIO.exportAllQuestionSets();
+    promise.catch(function (err) {
+      setMessage(err.message, true);
+    });
+  }
+
   function loadSampleQuestionSet(url) {
     setMessage("Lade Beispiel-Fragenset …", false);
     fetch(url)
@@ -308,6 +368,9 @@ var QuestionEditor = (function () {
               " · " +
               new Date(set.createdAt).toLocaleDateString("de-DE") +
               "</div></div>" +
+              '<button type="button" class="btn small" title="Als Excel-Datei herunterladen" onclick="QuestionEditor.exportExcel(\'' +
+              set.id +
+              "')\">Excel</button>" +
               '<button type="button" class="btn small primary" onclick="prepareQuiz(\'' +
               set.id +
               "', '" +
@@ -316,7 +379,8 @@ var QuestionEditor = (function () {
               "</div>"
             );
           })
-          .join("");
+          .join("") +
+          '<div class="btn-row"><button type="button" class="btn small" onclick="QuestionEditor.exportExcel()">Alle Fragensets als Excel herunterladen</button></div>';
       }
     );
   }
@@ -325,6 +389,8 @@ var QuestionEditor = (function () {
 
   return {
     handleJsonFile: handleJsonFile,
+    handleExcelFile: handleExcelFile,
+    exportExcel: exportExcel,
     loadSampleQuestionSet: loadSampleQuestionSet,
     addQuestionRow: addQuestionRow,
     removeQuestionRow: removeQuestionRow,

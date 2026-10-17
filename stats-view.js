@@ -3,6 +3,7 @@
 var StatsView = (function () {
   var currentSessionId = null;
   var currentSessionDetail = null; // { session, questionSet, rows: [{question, counts, correctCount, total}] }
+  var listedSessionIds = [];
 
   function populateFilters() {
     Promise.all([Store.listSubjects(), Store.listClassGroups()]).then(
@@ -48,6 +49,11 @@ var StatsView = (function () {
       var setById = indexBy(results[3]);
 
       var list = document.getElementById("statsSessionList");
+      listedSessionIds = sessions.map(function (s) {
+        return s.id;
+      });
+      var allButton = document.getElementById("statsExportAllBtn");
+      if (allButton) allButton.hidden = sessions.length === 0;
       if (sessions.length === 0) {
         list.innerHTML =
           '<p class="empty">Noch keine Quiz-Ergebnisse. Sie erscheinen hier, sobald ein Quiz gespielt wurde.</p>';
@@ -278,6 +284,27 @@ var StatsView = (function () {
     );
   }
 
+  function exportExcel() {
+    if (!currentSessionId) return;
+    ExcelIO.exportSession(currentSessionId).catch(function (err) {
+      setExportMessage(err.message, true);
+    });
+  }
+
+  function exportAllExcel() {
+    var el = document.getElementById("statsListMessage");
+    ExcelIO.exportSessions(listedSessionIds)
+      .then(function () {
+        if (el) el.textContent = "";
+      })
+      .catch(function (err) {
+        if (el) {
+          el.textContent = err.message;
+          el.style.color = "crimson";
+        }
+      });
+  }
+
   function setExportMessage(text, isError) {
     var el = document.getElementById("statsExportMessage");
     if (!el) return;
@@ -340,6 +367,8 @@ var StatsView = (function () {
     selectSession: selectSession,
     exportClipboard: exportClipboard,
     exportCsv: exportCsv,
+    exportExcel: exportExcel,
+    exportAllExcel: exportAllExcel,
     suggestReview: suggestReview,
     createReviewSet: createReviewSet,
   };

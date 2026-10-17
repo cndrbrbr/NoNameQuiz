@@ -10,7 +10,9 @@
   <script src="cv.js"></script>
   <script src="aruco.js"></script>
   <script src="store.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
   <script src="export.js"></script>
+  <script src="excel.js"></script>
   <script src="backup.js"></script>
   <script src="review.js"></script>
   <script src="question-editor.js"></script>
@@ -922,8 +924,8 @@
           <span class="choice-sub">Fragen und Antworten eintippen</span>
         </button>
         <button type="button" class="choice" data-kind="file" onclick="openCreate('file')">
-          <span class="choice-title">Datei oder Beispiel</span>
-          <span class="choice-sub">Fertiges Fragenset laden</span>
+          <span class="choice-title">Excel-Datei</span>
+          <span class="choice-sub">Fragen in Excel schreiben und hochladen</span>
         </button>
       </div>
       <div id="qsMessage" class="msg"></div>
@@ -967,16 +969,38 @@
 
       <!-- Datei / Beispiel -->
       <div id="panelFile" class="card" style="margin-top:14px;" hidden>
-        <h3>Datei oder Beispiel laden</h3>
-        <label class="field">Fragenset-Datei (.json) vom Gerät wählen
-          <input type="file" id="qsJsonFile" accept="application/json"
-            onchange="QuestionEditor.handleJsonFile(this.files[0])">
-        </label>
-        <p class="hint">Oder zum Ausprobieren:</p>
+        <h3>Fragen aus Excel übernehmen</h3>
+        <p class="hint">
+          1. Vorlage herunterladen und in Excel öffnen.<br>
+          2. Titel, Fach und die Fragen eintragen: pro Zeile Fragetext, vier Antworten
+          und in der letzten Spalte der Buchstabe der richtigen Antwort (A–D).<br>
+          3. Speichern und hier hochladen. Jedes Blatt der Datei wird ein eigenes Fragenset.
+        </p>
+        <div class="btn-row">
+          <button type="button" class="btn" onclick="ExcelIO.downloadTemplate()">Excel-Vorlage herunterladen</button>
+          <label class="btn primary">Excel-Datei hochladen
+            <input type="file" id="qsExcelFile" hidden
+              accept=".xlsx,.xls,.ods,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              onchange="QuestionEditor.handleExcelFile(this.files[0]); this.value = '';">
+          </label>
+        </div>
+        <p class="hint">
+          Ein vorhandenes Fragenset ändern: oben bei „Meine Fragensets“ auf „Excel“
+          tippen, die Datei bearbeiten und wieder hochladen. Es wird dann als neues
+          Fragenset gespeichert.
+        </p>
+        <details>
+          <summary>Weitere Möglichkeiten</summary>
+          <label class="field">Fragenset-Datei (.json) vom Gerät wählen
+            <input type="file" id="qsJsonFile" accept="application/json"
+              onchange="QuestionEditor.handleJsonFile(this.files[0])">
+          </label>
+          <p class="hint">Oder zum Ausprobieren:</p>
         <button type="button" class="btn"
           onclick="QuestionEditor.loadSampleQuestionSet('sample-data/informatik-grundlagen.json')">
           Beispiel „Informatik Grundlagen“ laden
         </button>
+        </details>
       </div>
 
       <!-- Editor (für "Selbst schreiben" und zum Prüfen des KI-Vorschlags) -->
@@ -1042,6 +1066,10 @@
         </div>
         <p class="hint">Eine Sitzung antippen, um die Ergebnisse zu sehen.</p>
         <div id="statsSessionList"></div>
+        <div class="btn-row">
+          <button type="button" id="statsExportAllBtn" class="btn" hidden onclick="StatsView.exportAllExcel()">Alle angezeigten Ergebnisse als Excel herunterladen</button>
+        </div>
+        <div id="statsListMessage" class="msg"></div>
       </div>
 
       <div id="statsDetailCard" class="card" hidden>
@@ -1049,6 +1077,7 @@
 
         <h3 style="margin-top:18px;">Exportieren</h3>
         <div class="btn-row">
+          <button type="button" class="btn primary" onclick="StatsView.exportExcel()">Als Excel herunterladen</button>
           <button type="button" class="btn" onclick="StatsView.exportClipboard()">Kopieren (für OneNote)</button>
           <button type="button" class="btn" onclick="StatsView.exportCsv()">Als CSV herunterladen</button>
         </div>
