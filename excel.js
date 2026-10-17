@@ -49,11 +49,12 @@ var ExcelIO = (function () {
         else if (existing.t === "s") existing.z = "@";
       }
     }
-    sheet["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: TEXT_ROWS - 1, c: Math.max(lastCol, 1) } });
+    var existing = sheet["!ref"] ? XLSX.utils.decode_range(sheet["!ref"]).e.c : 0;
+    sheet["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: TEXT_ROWS - 1, c: Math.max(lastCol, existing, 1) } });
   }
 
   function addSheet(workbook, name, rows, colWidths, used, textFromRow) {
-    var sheet = XLSX.utils.aoa_to_sheet(rows);
+    var sheet = XLSX.utils.aoa_to_sheet(rows, { dateNF: "m/d/yy" } /* Format 14: Excel zeigt das Datum im Systemformat, z.B. 17.10.2026 */);
     if (textFromRow != null) formatAsText(sheet, textFromRow, QUESTION_HEADER.length - 1);
     if (colWidths) {
       sheet["!cols"] = colWidths.map(function (w) {
@@ -79,12 +80,51 @@ var ExcelIO = (function () {
 
   var QUESTION_COLS = [60, 28, 28, 28, 28, 14];
 
-  function questionSetRows(title, subject, questions) {
-    var rows = [["Titel", title], ["Fach", subject], [], QUESTION_HEADER];
+  // history (optional, aus lastAskedByClass): je Klasse eine Spalte "Zuletzt
+  // gestellt" rechts neben den Fragen. Der Import liest nur die Spalten A–F,
+  // die Spalten stören beim Wiederhochladen also nicht.
+  function questionSetRows(title, subject, questions, history) {
+    var classes = history ? history.classes : [];
+    var header = QUESTION_HEADER.concat(
+      classes.map(function (c) {
+        return "Zuletzt gestellt " + c.name;
+      })
+    );
+    var rows = [["Titel", title], ["Fach", subject], [], header];
     questions.forEach(function (q) {
-      rows.push([q.text, q.optionA, q.optionB, q.optionC, q.optionD, q.correctAnswer]);
+      var last = history ? history.byKey[Analysis.questionKey(q)] || {} : {};
+      rows.push(
+        [q.text, q.optionA, q.optionB, q.optionC, q.optionD, q.correctAnswer].concat(
+          classes.map(function (c) {
+            return last[c.id] || "";
+          })
+        )
+      );
     });
     return rows;
+  }
+
+  // Letztes Datum, an dem jede Frage einer Klasse gestellt wurde – nur Klassen,
+  // die mindestens eine der Fragen hatten, alphabetisch.
+  function lastAskedByClass(model, questions) {
+    var byKey = {};
+    var classIds = {};
+    questions.forEach(function (q) {
+      var key = Analysis.questionKey(q);
+      (model.askingsByKey[key] || []).forEach(function (a) {
+        var last = (byKey[key] = byKey[key] || {});
+        if (!last[a.entry.classId] || last[a.entry.classId] < a.entry.date) last[a.entry.classId] = a.entry.date;
+        classIds[a.entry.classId] = true;
+      });
+    });
+    var classes = Object.keys(classIds)
+      .map(function (id) {
+        return { id: id, name: (model.classesById[id] || {}).name || "?" };
+      })
+      .sort(function (a, b) {
+        return a.name.localeCompare(b.name, "de", { numeric: true });
+      });
+    return { byKey: byKey, classes: classes };
   }
 
   function downloadTemplate() {
@@ -122,23 +162,29 @@ var ExcelIO = (function () {
   }
 
   function exportQuestionSets(setIds) {
-    return Promise.all([Store.listSubjects()].concat(setIds.map(Store.getQuestionSetWithQuestions))).then(
+    return Promise.all([Store.listSubjects(), Analysis.load()].concat(setIds.map(Store.getQuestionSetWithQuestions))).then(
       function (results) {
         var subjectById = {};
         results[0].forEach(function (s) {
           subjectById[s.id] = s.name;
         });
-        var sets = results.slice(1).filter(Boolean);
+        var model = results[1];
+        var sets = results.slice(2).filter(Boolean);
         if (sets.length === 0) throw new Error("Keine Fragensets vorhanden.");
 
         var workbook = XLSX.utils.book_new();
         var used = { anleitung: true };
         sets.forEach(function (set) {
+          var history = lastAskedByClass(model, set.questions);
           addSheet(
             workbook,
             set.title,
-            questionSetRows(set.title, subjectById[set.subjectId] || "", set.questions),
-            QUESTION_COLS,
+            questionSetRows(set.title, subjectById[set.subjectId] || "", set.questions, history),
+            QUESTION_COLS.concat(
+              history.classes.map(function () {
+                return 14;
+              })
+            ),
             used,
             0
           );

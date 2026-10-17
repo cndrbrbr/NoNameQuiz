@@ -97,7 +97,9 @@ The app has three tabs: **Quiz** (live round), **Fragen** (question sets) and
 - "Weitere Möglichkeiten": JSON upload (format in
   [architecture.md](architecture.md#format-für-den-fragen-upload-json)) and a sample
   set.
-- **Meine Fragensets**: per set "Excel" (download), "Löschen" (confirm; sets that
+- **Meine Fragensets**: per set "Excel" (download; besides the question columns
+  it adds one "Zuletzt gestellt <class>" date column per class that had any of
+  the questions — ignored on re-upload), "Löschen" (confirm; sets that
   were already used in a quiz are only hidden so results stay intact), "Quiz
   starten"; plus "Alle Fragensets als Excel herunterladen".
 - **Daten sichern**: full backup of all data as one JSON file and restore/merge on

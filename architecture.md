@@ -351,6 +351,10 @@ offline).
   Blätter derselben Datei werden trotzdem übernommen.
 - Vorlage und Exporte formatieren die Zellen als Text (`z: "@"`, vorbelegt bis
   Zeile 200), damit Excel z. B. "1/2" nicht in ein Datum umwandelt.
+- Beim Export eines Fragensets folgen rechts von Spalte F Spalten
+  "Zuletzt gestellt <Klasse>" (je Klasse, die eine der Fragen hatte, Datum
+  der letzten Stellung als echter Excel-Datumswert im Systemformat,
+  Format-ID 14). Der Import liest nur A–F, die Spalten stören also nicht.
 - Erneutes Hochladen eines bearbeiteten Sets legt ein **neues** Set an (die
   Fragen-IDs der alten Sitzungen bleiben gültig); das alte kann gelöscht
   werden. Die Auswertung verbindet beide über den Fragetext.
