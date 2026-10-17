@@ -264,6 +264,37 @@ var QuestionEditor = (function () {
     return questions;
   }
 
+  // Wie collectFormQuestions, aber ohne Pflichtfeld-Prüfung: auch ein
+  // unfertiger Entwurf lässt sich nach Excel mitnehmen.
+  function exportDraftExcel() {
+    var questions = [];
+    document.querySelectorAll(".qs-question-row").forEach(function (row) {
+      var correctEl = row.querySelector(".qs-correct:checked");
+      var q = {
+        text: row.querySelector(".qs-text").value.trim(),
+        optionA: row.querySelector(".qs-option-A").value.trim(),
+        optionB: row.querySelector(".qs-option-B").value.trim(),
+        optionC: row.querySelector(".qs-option-C").value.trim(),
+        optionD: row.querySelector(".qs-option-D").value.trim(),
+        correctAnswer: correctEl ? correctEl.value : "",
+      };
+      if (q.text || q.optionA || q.optionB || q.optionC || q.optionD) questions.push(q);
+    });
+    if (questions.length === 0) {
+      setMessage("Noch keine Fragen im Editor.", true);
+      return;
+    }
+    ExcelIO.exportDraft(
+      document.getElementById("qsTitle").value.trim(),
+      document.getElementById("qsSubject").value.trim(),
+      questions
+    );
+    setMessage(
+      "Excel-Datei heruntergeladen. Nach dem Bearbeiten unter „Excel-Datei“ hochladen – dann diesen Entwurf hier verwerfen, sonst gibt es das Fragenset doppelt.",
+      false
+    );
+  }
+
   function saveManualQuestionSet() {
     var title = document.getElementById("qsTitle").value.trim();
     var subjectName = document.getElementById("qsSubject").value.trim();
@@ -413,6 +444,7 @@ var QuestionEditor = (function () {
     handleJsonFile: handleJsonFile,
     handleExcelFile: handleExcelFile,
     exportExcel: exportExcel,
+    exportDraftExcel: exportDraftExcel,
     deleteSet: deleteSet,
     loadSampleQuestionSet: loadSampleQuestionSet,
     addQuestionRow: addQuestionRow,

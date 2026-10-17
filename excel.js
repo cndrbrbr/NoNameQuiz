@@ -152,6 +152,14 @@ var ExcelIO = (function () {
     );
   }
 
+  // Ungespeicherter Stand aus dem Editor (z.B. KI-Vorschlag) – zum Prüfen und
+  // Bearbeiten in Excel, danach normal hochladen.
+  function exportDraft(title, subject, questions) {
+    var workbook = XLSX.utils.book_new();
+    addSheet(workbook, title || "Fragenset", questionSetRows(title, subject, questions), QUESTION_COLS, { anleitung: true }, 0);
+    download(workbook, "fragenset-" + fileSafe(title || "entwurf") + ".xlsx");
+  }
+
   function exportQuestionSet(setId) {
     return exportQuestionSets([setId]);
   }
@@ -552,6 +560,7 @@ var ExcelIO = (function () {
   return {
     downloadTemplate: downloadTemplate,
     exportQuestionSet: exportQuestionSet,
+    exportDraft: exportDraft,
     exportAllQuestionSets: exportAllQuestionSets,
     parseQuestionSheets: parseQuestionSheets,
     exportSession: exportSession,
