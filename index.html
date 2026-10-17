@@ -290,6 +290,13 @@
     var confirmedCards = {};
     var attendanceLocked = false;
 
+    // Gegen Fehlerkennungen (Geisterkarten, kurz falsch gelesene Antwort
+    // beim Drehen): Karte + Antwort zählen erst, wenn sie in so vielen
+    // aufeinanderfolgenden Kamerabildern gleich erkannt wurden.
+    var CONFIRM_FRAMES = 3;
+    var frameNumber = 0;
+    var markerStreaks = {}; // id -> { answer, count, frame }
+
     // --- Navigation / Präsentationsmodus ------------------------------------
 
     function showView(name) {
@@ -532,6 +539,7 @@
         snapshot();
 
         var markers = detector.detect(imageData);
+        frameNumber++;
         drawCorners(markers);
         drawId(markers);
       }
@@ -571,21 +579,40 @@
     function drawId(markers) {
       var corners, corner, x, y, i, j;
 
-      context.strokeStyle = "blue";
+      var changed = false;
+
       context.lineWidth = 1;
 
       for (i = 0; i !== markers.length; ++i) {
-        if (markers[i].id === 0) {
+        var id = markers[i].id;
+        if (id === 0) {
           continue;
         }
 
-        activeCards[markers[i].id] = true;
+        var answer = getAnswer(markers[i]);
+        var streak = markerStreaks[id];
+        if (streak && streak.frame === frameNumber) {
+          continue; // dieselbe ID zweimal im selben Bild: Fehlerkennung
+        }
+        if (streak && streak.frame === frameNumber - 1 && streak.answer === answer) {
+          streak.count++;
+          streak.frame = frameNumber;
+        } else {
+          streak = markerStreaks[id] = { answer: answer, count: 1, frame: frameNumber };
+        }
+        var confirmed = streak.count >= CONFIRM_FRAMES;
 
-        if (!attendanceLocked || confirmedCards[markers[i].id]) {
-          QuizRunner.recordAnswer(markers[i].id, getAnswer(markers[i]));
+        if (confirmed) {
+          if (!activeCards[id]) changed = true;
+          activeCards[id] = true;
+
+          if (QuizRunner.hasActiveSession() && (!attendanceLocked || confirmedCards[id])) {
+            if (QuizRunner.getResponses()[id] !== answer) changed = true;
+            QuizRunner.recordAnswer(id, answer);
+          }
         }
 
-        updateResults();
+        context.strokeStyle = confirmed ? "blue" : "gray";
 
         corners = markers[i].corners;
 
@@ -599,12 +626,10 @@
           y = Math.min(y, corner.y);
         }
 
-        context.strokeText(
-          markers[i].id + " : " + getAnswer(markers[i]),
-          x,
-          y
-        );
+        context.strokeText(id + " : " + answer, x, y);
       }
+
+      if (changed) updateResults();
     }
 
     function getAnswer(marker) {
