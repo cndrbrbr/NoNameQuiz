@@ -1186,6 +1186,10 @@
           <select id="statsSetSelect" onchange="StatsView.renderCumulative()"></select>
         </label>
         <div id="statsCumulative"></div>
+        <div class="btn-row">
+          <button type="button" class="btn primary" onclick="StatsView.exportCumulative()">Diese Übersicht als Excel herunterladen</button>
+        </div>
+        <div id="statsCumulativeMessage" class="msg"></div>
       </div>
     </section>
 

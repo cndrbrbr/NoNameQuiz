@@ -481,6 +481,30 @@ var ExcelIO = (function () {
     return { workbook: workbook, entries: entries };
   }
 
+  // Genau die Ansicht "Fragen über alle Quiz" mit ihren Filtern.
+  function exportCumulative(filter) {
+    return Analysis.load().then(function (model) {
+      var rows = cumulativeRows(model, filter, true);
+      if (rows.length === 1) throw new Error("Noch keine Fragen gestellt.");
+      var name = function (list, id) {
+        var item = list.filter(function (i) {
+          return i.id === id;
+        })[0];
+        return item ? item.name || item.title : "alle";
+      };
+      var info = [
+        ["Fach", filter.subjectId ? name(model.subjects, filter.subjectId) : "alle"],
+        ["Klasse", filter.classId ? name(model.classes, filter.classId) : "alle"],
+        ["Fragenset", filter.questionSetId ? (model.setsById[filter.questionSetId] || {}).title : "alle gestellten Fragen"],
+        ["Stand", formatDate(new Date().toISOString())],
+        [],
+      ];
+      var workbook = XLSX.utils.book_new();
+      addSheet(workbook, "Fragen kumuliert", info.concat(rows), CUMULATIVE_COLS, {});
+      download(workbook, "fragen-kumuliert-" + today() + ".xlsx");
+    });
+  }
+
   // filter.classId gesetzt: eine Datei; sonst eine Datei für jede Klasse mit Quiz.
   function exportClasses(filter) {
     return Analysis.load().then(function (model) {
@@ -533,6 +557,7 @@ var ExcelIO = (function () {
     exportSession: exportSession,
     exportSessions: exportSessions,
     exportClasses: exportClasses,
+    exportCumulative: exportCumulative,
     classWorkbook: classWorkbook,
   };
 })();

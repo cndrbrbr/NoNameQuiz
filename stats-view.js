@@ -275,6 +275,16 @@ var StatsView = (function () {
     });
   }
 
+  function exportCumulative() {
+    ExcelIO.exportCumulative(currentFilter()).catch(function (err) {
+      var el = document.getElementById("statsCumulativeMessage");
+      if (el) {
+        el.textContent = err.message;
+        el.style.color = "crimson";
+      }
+    });
+  }
+
   function exportClassFiles() {
     var el = document.getElementById("statsListMessage");
     var classId = document.getElementById("statsClassSelect").value;
@@ -473,6 +483,7 @@ var StatsView = (function () {
     exportCsv: exportCsv,
     exportExcel: exportExcel,
     exportClassFiles: exportClassFiles,
+    exportCumulative: exportCumulative,
     renderCumulative: renderCumulative,
     exportAllExcel: exportAllExcel,
     suggestReview: suggestReview,
