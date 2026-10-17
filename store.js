@@ -202,8 +202,52 @@ var Store = (function () {
     });
   }
 
-  function listQuestionSets() {
-    return getAll("questionSets");
+  // Gelöschte Sets, zu denen es noch Quiz-Ergebnisse gibt, sind nur
+  // ausgeblendet (deleted: true) – die Auswertung braucht ihre Fragen weiter.
+  function listQuestionSets(options) {
+    var includeDeleted = options && options.includeDeleted;
+    return getAll("questionSets").then(function (sets) {
+      return includeDeleted
+        ? sets
+        : sets.filter(function (s) {
+            return !s.deleted;
+          });
+    });
+  }
+
+  function deleteQuestionSet(questionSetId) {
+    return Promise.all([
+      getAll("sessions"),
+      get("questionSets", questionSetId),
+      getAllByIndex("questions", "questionSetId", questionSetId),
+    ]).then(function (results) {
+      var used = results[0].some(function (s) {
+        return s.questionSetId === questionSetId;
+      });
+      var questionSet = results[1];
+      if (!questionSet) return { hidden: false };
+      if (used) {
+        questionSet.deleted = true;
+        questionSet.deletedAt = new Date().toISOString();
+        return put("questionSets", questionSet).then(function () {
+          return { hidden: true };
+        });
+      }
+      return tx(["questionSets", "questions"], "readwrite").then(function (t) {
+        return new Promise(function (resolve, reject) {
+          t.objectStore("questionSets").delete(questionSetId);
+          results[2].forEach(function (q) {
+            t.objectStore("questions").delete(q.id);
+          });
+          t.oncomplete = function () {
+            resolve({ hidden: false });
+          };
+          t.onerror = function () {
+            reject(t.error);
+          };
+        });
+      });
+    });
   }
 
   function getQuestionSetWithQuestions(questionSetId) {
@@ -373,6 +417,7 @@ var Store = (function () {
     findOrCreateClassGroup: findOrCreateClassGroup,
     saveQuestionSet: saveQuestionSet,
     listQuestionSets: listQuestionSets,
+    deleteQuestionSet: deleteQuestionSet,
     getQuestionSetWithQuestions: getQuestionSetWithQuestions,
     createSession: createSession,
     updateSession: updateSession,

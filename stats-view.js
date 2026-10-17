@@ -41,7 +41,7 @@ var StatsView = (function () {
       }),
       Store.listSubjects(),
       Store.listClassGroups(),
-      Store.listQuestionSets(),
+      Store.listQuestionSets({ includeDeleted: true }),
     ]).then(function (results) {
       var sessions = results[0];
       var subjectById = indexBy(results[1]);

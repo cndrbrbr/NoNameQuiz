@@ -141,6 +141,23 @@ var QuestionEditor = (function () {
       });
   }
 
+  function deleteSet(setId, title) {
+    if (!confirm("Fragenset „" + title + "“ wirklich löschen?")) return;
+    Store.deleteQuestionSet(setId)
+      .then(function (result) {
+        setMessage(
+          "Fragenset „" + title + "“ gelöscht." +
+            (result.hidden ? " Die bisherigen Quiz-Ergebnisse dazu bleiben in der Auswertung erhalten." : ""),
+          false
+        );
+        notifyChanged();
+        renderQuestionSetList();
+      })
+      .catch(function (err) {
+        setMessage("Löschen fehlgeschlagen: " + err.message, true);
+      });
+  }
+
   function exportExcel(setId) {
     var promise = setId ? ExcelIO.exportQuestionSet(setId) : ExcelIO.exportAllQuestionSets();
     promise.catch(function (err) {
@@ -371,6 +388,11 @@ var QuestionEditor = (function () {
               '<button type="button" class="btn small" title="Als Excel-Datei herunterladen" onclick="QuestionEditor.exportExcel(\'' +
               set.id +
               "')\">Excel</button>" +
+              '<button type="button" class="btn small danger" title="Fragenset löschen" onclick="QuestionEditor.deleteSet(\'' +
+              set.id +
+              "', this.dataset.title)\" data-title=\"" +
+              escapeHtml(set.title).replace(/"/g, "&quot;") +
+              '">Löschen</button>' +
               '<button type="button" class="btn small primary" onclick="prepareQuiz(\'' +
               set.id +
               "', '" +
@@ -391,6 +413,7 @@ var QuestionEditor = (function () {
     handleJsonFile: handleJsonFile,
     handleExcelFile: handleExcelFile,
     exportExcel: exportExcel,
+    deleteSet: deleteSet,
     loadSampleQuestionSet: loadSampleQuestionSet,
     addQuestionRow: addQuestionRow,
     removeQuestionRow: removeQuestionRow,
