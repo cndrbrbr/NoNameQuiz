@@ -510,7 +510,12 @@
         });
 
       detector = new AR.Detector({
-        dictionaryName: "ARUCO"
+        dictionaryName: "ARUCO",
+        // Nur exakt gelesene Muster akzeptieren. Standard wäre bis zu 2
+        // falsche Bits – die Codes im ARUCO-Satz liegen aber teils nur 3 Bits
+        // auseinander, so wurde aus einer echten Karte eine Karte, die es
+        // nicht gibt (oder eine falsche Drehung = falsche Antwort).
+        maxHammingDistance: 1
       });
     }
 
